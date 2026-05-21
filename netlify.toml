@@ -1,8 +1,7 @@
 [build]
-  command = "bun run build"
-  publish = "dist"
+command = "bun run build"
+publish = "dist/client"
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+[dev]
+command = "bun run dev"
+port = 3000
