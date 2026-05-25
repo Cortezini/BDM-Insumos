@@ -26,7 +26,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           from: 'Inventário <onboarding@resend.dev>', // Email padrão de teste do Resend
-          to: ['matheusmoraescortezini@gmail.com'], // COLOQUE AQUI O EMAIL QUE VOCÊ USOU PARA CRIAR A CONTA NO RESEND
+          to: ['matheus@bdmgrupo.com', 'financeiro01@bdmgrupo.com'], // COLOQUE AQUI O EMAIL QUE VOCÊ USOU PARA CRIAR A CONTA NO RESEND
           subject: `⚠️ Alerta de Estoque: ${record.name}`,
           html: `
             <div style="font-family: sans-serif; color: #333;">

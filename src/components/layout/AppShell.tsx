@@ -15,23 +15,26 @@ import {
   Search,
   Bell,
   Boxes,
+  Calculator, // 1. IMPORTADO O ÍCONE DA CALCULADORA PARA AS COTAÇÕES
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+// 2. ADICIONADO "COTAÇÕES" NA LISTA DE NAVEGAÇÃO DO MENU
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/produtos", label: "Produtos", icon: Package },
   { to: "/movimentacoes", label: "Movimentações", icon: ArrowLeftRight },
   { to: "/fornecedores", label: "Fornecedores", icon: Truck },
+  { to: "/quotations", label: "Cotações", icon: Calculator }, // <-- Nova linha aqui!
   { to: "/pessoas", label: "Pessoas", icon: Users },
   { to: "/centros-de-custo", label: "Centros de Custo", icon: Building2 },
   { to: "/localizacoes", label: "Localizações", icon: MapPin },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
-] as const;
+];
 
 export function AppShell() {
   const { profile, signOut } = useAuth();

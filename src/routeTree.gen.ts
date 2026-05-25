@@ -11,9 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthRegisterRouteImport } from './routes/auth.register'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
+import { Route as AuthenticatedQuotationsRouteImport } from './routes/_authenticated/quotations'
 import { Route as AuthenticatedProdutosRouteImport } from './routes/_authenticated/produtos'
 import { Route as AuthenticatedPessoasRouteImport } from './routes/_authenticated/pessoas'
 import { Route as AuthenticatedMovimentacoesRouteImport } from './routes/_authenticated/movimentacoes'
@@ -31,11 +31,6 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthRegisterRoute = AuthRegisterRouteImport.update({
-  id: '/auth/register',
-  path: '/auth/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/auth/login',
   path: '/auth/login',
@@ -44,6 +39,11 @@ const AuthLoginRoute = AuthLoginRouteImport.update({
 const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedQuotationsRoute = AuthenticatedQuotationsRouteImport.update({
+  id: '/quotations',
+  path: '/quotations',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedProdutosRoute = AuthenticatedProdutosRouteImport.update({
@@ -96,9 +96,9 @@ export interface FileRoutesByFullPath {
   '/movimentacoes': typeof AuthenticatedMovimentacoesRoute
   '/pessoas': typeof AuthenticatedPessoasRoute
   '/produtos': typeof AuthenticatedProdutosRoute
+  '/quotations': typeof AuthenticatedQuotationsRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/auth/login': typeof AuthLoginRoute
-  '/auth/register': typeof AuthRegisterRoute
 }
 export interface FileRoutesByTo {
   '/centros-de-custo': typeof AuthenticatedCentrosDeCustoRoute
@@ -108,9 +108,9 @@ export interface FileRoutesByTo {
   '/movimentacoes': typeof AuthenticatedMovimentacoesRoute
   '/pessoas': typeof AuthenticatedPessoasRoute
   '/produtos': typeof AuthenticatedProdutosRoute
+  '/quotations': typeof AuthenticatedQuotationsRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/auth/login': typeof AuthLoginRoute
-  '/auth/register': typeof AuthRegisterRoute
   '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
@@ -123,9 +123,9 @@ export interface FileRoutesById {
   '/_authenticated/movimentacoes': typeof AuthenticatedMovimentacoesRoute
   '/_authenticated/pessoas': typeof AuthenticatedPessoasRoute
   '/_authenticated/produtos': typeof AuthenticatedProdutosRoute
+  '/_authenticated/quotations': typeof AuthenticatedQuotationsRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/auth/login': typeof AuthLoginRoute
-  '/auth/register': typeof AuthRegisterRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
@@ -139,9 +139,9 @@ export interface FileRouteTypes {
     | '/movimentacoes'
     | '/pessoas'
     | '/produtos'
+    | '/quotations'
     | '/relatorios'
     | '/auth/login'
-    | '/auth/register'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/centros-de-custo'
@@ -151,9 +151,9 @@ export interface FileRouteTypes {
     | '/movimentacoes'
     | '/pessoas'
     | '/produtos'
+    | '/quotations'
     | '/relatorios'
     | '/auth/login'
-    | '/auth/register'
     | '/'
   id:
     | '__root__'
@@ -165,16 +165,15 @@ export interface FileRouteTypes {
     | '/_authenticated/movimentacoes'
     | '/_authenticated/pessoas'
     | '/_authenticated/produtos'
+    | '/_authenticated/quotations'
     | '/_authenticated/relatorios'
     | '/auth/login'
-    | '/auth/register'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthLoginRoute: typeof AuthLoginRoute
-  AuthRegisterRoute: typeof AuthRegisterRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -193,13 +192,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/auth/register': {
-      id: '/auth/register'
-      path: '/auth/register'
-      fullPath: '/auth/register'
-      preLoaderRoute: typeof AuthRegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth/login': {
       id: '/auth/login'
       path: '/auth/login'
@@ -212,6 +204,13 @@ declare module '@tanstack/react-router' {
       path: '/relatorios'
       fullPath: '/relatorios'
       preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/quotations': {
+      id: '/_authenticated/quotations'
+      path: '/quotations'
+      fullPath: '/quotations'
+      preLoaderRoute: typeof AuthenticatedQuotationsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/produtos': {
@@ -274,6 +273,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMovimentacoesRoute: typeof AuthenticatedMovimentacoesRoute
   AuthenticatedPessoasRoute: typeof AuthenticatedPessoasRoute
   AuthenticatedProdutosRoute: typeof AuthenticatedProdutosRoute
+  AuthenticatedQuotationsRoute: typeof AuthenticatedQuotationsRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
@@ -286,6 +286,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMovimentacoesRoute: AuthenticatedMovimentacoesRoute,
   AuthenticatedPessoasRoute: AuthenticatedPessoasRoute,
   AuthenticatedProdutosRoute: AuthenticatedProdutosRoute,
+  AuthenticatedQuotationsRoute: AuthenticatedQuotationsRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
@@ -297,7 +298,6 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthLoginRoute: AuthLoginRoute,
-  AuthRegisterRoute: AuthRegisterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
