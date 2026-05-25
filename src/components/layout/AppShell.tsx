@@ -46,8 +46,8 @@ export function AppShell() {
             <Boxes className="size-5" />
           </div>
           <div>
-            <div className="font-semibold text-sm leading-none">Inventário</div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">Gestão executiva</div>
+            <div className="font-semibold text-sm leading-none">BDM</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">Gestão de Insumos</div>
           </div>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
