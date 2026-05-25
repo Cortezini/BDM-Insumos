@@ -25,7 +25,7 @@ serve(async (req) => {
           'Authorization': `Bearer ${RESEND_API_KEY}`
         },
         body: JSON.stringify({
-          from: 'Inventário <onboarding@resend.dev>', // Email padrão de teste do Resend
+          from: 'Inventário <alertas@bdmgrupo.com>', // Email padrão de teste do Resend
           to: ['matheus@bdmgrupo.com', 'financeiro01@bdmgrupo.com'], // COLOQUE AQUI O EMAIL QUE VOCÊ USOU PARA CRIAR A CONTA NO RESEND
           subject: `⚠️ Alerta de Estoque: ${record.name}`,
           html: `
