@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Boxes, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,15 +39,15 @@ function LoginPage() {
           <div className="size-10 rounded-lg bg-primary-foreground/15 grid place-items-center">
             <Boxes className="size-6" />
           </div>
-          <span className="font-semibold text-lg">Inventário</span>
+          <span className="font-semibold text-lg">BDM</span>
         </div>
         <div className="space-y-3">
-          <h1 className="text-4xl font-semibold leading-tight">Gestão executiva de estoque.</h1>
+          <h1 className="text-4xl font-semibold leading-tight">Gestão de Insumos</h1>
           <p className="text-primary-foreground/80 max-w-md">
             Controle produtos, fornecedores, movimentações e relatórios em um único lugar — pronto para sua operação.
           </p>
         </div>
-        <div className="text-xs text-primary-foreground/70">© {new Date().getFullYear()} Inventário</div>
+        <div className="text-xs text-primary-foreground/70">© {new Date().getFullYear()} BDM</div>
       </div>
       <div className="flex items-center justify-center p-6">
         <form onSubmit={submit} className="w-full max-w-sm space-y-5">
@@ -73,12 +73,6 @@ function LoginPage() {
             {loading && <Loader2 className="size-4 mr-2 animate-spin" />}
             Entrar
           </Button>
-          <p className="text-sm text-center text-muted-foreground">
-            Não tem conta?{" "}
-            <Link to="/auth/register" className="text-primary font-medium hover:underline">
-              Criar conta
-            </Link>
-          </p>
         </form>
       </div>
     </div>

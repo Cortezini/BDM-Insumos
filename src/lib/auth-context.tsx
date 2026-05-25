@@ -10,7 +10,6 @@ interface AuthCtx {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasRole: (...roles: UserRole[]) => boolean;
 }
@@ -52,18 +51,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate({ to: "/" });
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
-      },
-    });
-    if (error) throw error;
-  };
-
   const signOut = async () => {
     await supabase.auth.signOut();
     navigate({ to: "/auth/login" });
@@ -73,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ user: session?.user ?? null, session, profile, loading, signIn, signUp, signOut, hasRole }}
+      value={{ user: session?.user ?? null, session, profile, loading, signIn, signOut, hasRole }}
     >
       {children}
     </Ctx.Provider>
