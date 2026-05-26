@@ -15,7 +15,8 @@ import {
   Search,
   Bell,
   Boxes,
-  Calculator, // 1. IMPORTADO O ÍCONE DA CALCULADORA PARA AS COTAÇÕES
+  Calculator,
+  Network,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme";
@@ -28,7 +29,8 @@ const nav = [
   { to: "/produtos", label: "Produtos", icon: Package },
   { to: "/movimentacoes", label: "Movimentações", icon: ArrowLeftRight },
   { to: "/fornecedores", label: "Fornecedores", icon: Truck },
-  { to: "/quotations", label: "Cotações", icon: Calculator }, // <-- Nova linha aqui!
+  { to: "/quotations", label: "Cotações", icon: Calculator },
+  { to: "/assets", label: "Ativos de TI", icon: Network },
   { to: "/pessoas", label: "Pessoas", icon: Users },
   { to: "/centros-de-custo", label: "Centros de Custo", icon: Building2 },
   { to: "/localizacoes", label: "Localizações", icon: MapPin },

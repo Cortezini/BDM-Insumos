@@ -21,6 +21,7 @@ import { Route as AuthenticatedLocalizacoesRouteImport } from './routes/_authent
 import { Route as AuthenticatedFornecedoresRouteImport } from './routes/_authenticated/fornecedores'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCentrosDeCustoRouteImport } from './routes/_authenticated/centros-de-custo'
+import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -86,9 +87,15 @@ const AuthenticatedCentrosDeCustoRoute =
     path: '/centros-de-custo',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAssetsRoute = AuthenticatedAssetsRouteImport.update({
+  id: '/assets',
+  path: '/assets',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
+  '/assets': typeof AuthenticatedAssetsRoute
   '/centros-de-custo': typeof AuthenticatedCentrosDeCustoRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/auth/login': typeof AuthLoginRoute
 }
 export interface FileRoutesByTo {
+  '/assets': typeof AuthenticatedAssetsRoute
   '/centros-de-custo': typeof AuthenticatedCentrosDeCustoRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
@@ -116,6 +124,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/_authenticated/assets': typeof AuthenticatedAssetsRoute
   '/_authenticated/centros-de-custo': typeof AuthenticatedCentrosDeCustoRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/fornecedores': typeof AuthenticatedFornecedoresRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/assets'
     | '/centros-de-custo'
     | '/configuracoes'
     | '/fornecedores'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
     | '/auth/login'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/assets'
     | '/centros-de-custo'
     | '/configuracoes'
     | '/fornecedores'
@@ -158,6 +169,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
+    | '/_authenticated/assets'
     | '/_authenticated/centros-de-custo'
     | '/_authenticated/configuracoes'
     | '/_authenticated/fornecedores'
@@ -262,10 +274,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCentrosDeCustoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/assets': {
+      id: '/_authenticated/assets'
+      path: '/assets'
+      fullPath: '/assets'
+      preLoaderRoute: typeof AuthenticatedAssetsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAssetsRoute: typeof AuthenticatedAssetsRoute
   AuthenticatedCentrosDeCustoRoute: typeof AuthenticatedCentrosDeCustoRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedFornecedoresRoute: typeof AuthenticatedFornecedoresRoute
@@ -279,6 +299,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAssetsRoute: AuthenticatedAssetsRoute,
   AuthenticatedCentrosDeCustoRoute: AuthenticatedCentrosDeCustoRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedFornecedoresRoute: AuthenticatedFornecedoresRoute,
