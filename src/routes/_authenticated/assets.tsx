@@ -13,13 +13,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
-
 export const Route = createFileRoute("/_authenticated/assets")({
   component: TIAssetsPage,
 });
 
 const initialForm = {
-  id: undefined as string | undefined, // Controla se é uma edição
+  id: undefined as string | undefined,
   name: "",
   asset_type_id: "",
   location_id: "",
@@ -37,7 +36,11 @@ function TIAssetsPage() {
   const [filterStatus, setFilterStatus] = useState<string>("todos");
   const [formData, setFormData] = useState(initialForm);
 
-  // Consumindo as tabelas do projeto
+  // Estados locais para controle de paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10); // Quantidade fixa de 10 itens por página
+
+  // Consumindo tabelas reais do banco de dados do Supabase
   const { data: assets, isLoading: loadingAssets } = useList("ti_assets");
   const { data: assetTypes, isLoading: loadingTypes } = useList("asset_types");
   const { data: locations, isLoading: loadingLocations } = useList("locations"); 
@@ -46,7 +49,19 @@ function TIAssetsPage() {
   const upsertAsset = useUpsert("ti_assets");
   const deleteAsset = useDelete("ti_assets");
 
-  // Combina os ativos cruzando os IDs com os nomes reais do banco
+  // Efeito reativo para resetar a paginação ao mudar o filtro dos cards
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus]);
+
+  // Reseta o formulário automaticamente se o usuário fechar a Sheet lateral
+  useEffect(() => {
+    if (!isOpen) {
+      setFormData(initialForm);
+    }
+  }, [isOpen]);
+
+  // Cruzamento de dados de tabelas estrangeiras (IDs -> Nomes reais do Banco)
   const enrichedAssets = useMemo(() => {
     if (!assets || !assetTypes || !locations || !people) return [];
     
@@ -64,12 +79,25 @@ function TIAssetsPage() {
     });
   }, [assets, assetTypes, locations, people]);
 
-  // Filtro de listagem por status dos cards
+  // Aplicação do filtro por Status selecionado nos Cards
   const filteredAssets = useMemo(() => {
     if (filterStatus === "todos") return enrichedAssets;
     return enrichedAssets.filter((a: any) => a.status === filterStatus);
   }, [enrichedAssets, filterStatus]);
 
+  // Cálculo da Paginação: Fatiamento matemático do array principal
+  const paginatedAssets = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    return filteredAssets.slice(start, end);
+  }, [filteredAssets, currentPage, pageSize]);
+
+  // Totalizador matemático de páginas
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredAssets.length / pageSize);
+  }, [filteredAssets, pageSize]);
+
+  // Agregadores para os cards contadores do topo da tela
   const counters = useMemo(() => {
     if (!assets) return { total: 0, emUso: 0, manutencao: 0, backup: 0 };
     const arr = assets as any[];
@@ -81,10 +109,10 @@ function TIAssetsPage() {
     };
   }, [assets]);
 
-  // Função para abrir o Sheet em modo de Edição preenchendo os campos
+  // Função disparada ao clicar no Lápis (Prepara a UI para edição)
   const handleEdit = (asset: any) => {
     setFormData({
-      id: asset.id, // O ID avisa o hook useUpsert que é para ATUALIZAR, não criar um novo
+      id: asset.id,
       name: asset.name || "",
       asset_type_id: asset.asset_type_id || "",
       location_id: asset.location_id || "",
@@ -99,13 +127,6 @@ function TIAssetsPage() {
     setIsOpen(true);
   };
 
-  // Reseta o formulário caso o usuário feche a janela lateral
-  useEffect(() => {
-    if (!isOpen) {
-      setFormData(initialForm);
-    }
-  }, [isOpen]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -113,14 +134,14 @@ function TIAssetsPage() {
       toast.success(formData.id ? "Ativo atualizado com sucesso!" : "Ativo registrado com sucesso!");
       setIsOpen(false);
     } catch (error) {
-      toast.error("Erro ao salvar alterações do dispositivo.");
+      toast.error("Erro ao salvar alterações do dispositivo no banco.");
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Deseja remover este dispositivo do inventário?")) {
+    if (confirm("Deseja remover este dispositivo do inventário de TI?")) {
       await deleteAsset.mutateAsync(id);
-      toast.success("Ativo excluído do sistema.");
+      toast.success("Ativo excluído com sucesso.");
     }
   };
 
@@ -142,7 +163,7 @@ function TIAssetsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Inventário de TI</h1>
-          <p className="text-muted-foreground">Controle de hardware, alterações de status e infraestrutura.</p>
+          <p className="text-muted-foreground">Controle centralizado de hardware, infraestrutura e atribuições.</p>
         </div>
         
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -158,7 +179,7 @@ function TIAssetsPage() {
             <form onSubmit={handleSubmit} className="mt-6 space-y-4 pb-6">
               <div className="space-y-2">
                 <Label>Nome do Dispositivo</Label>
-                <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required placeholder="Ex: Notebook Dell Latitude" />
+                <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required placeholder="Ex: Servidor Storage Dell" />
               </div>
 
               <div className="space-y-2">
@@ -225,7 +246,7 @@ function TIAssetsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Endereço IP</Label>
-                  <Input value={formData.ip_address} onChange={(e) => setFormData({...formData, ip_address: e.target.value})} placeholder="Ex: 192.168.1.50" />
+                  <Input value={formData.ip_address} onChange={(e) => setFormData({...formData, ip_address: e.target.value})} placeholder="Ex: 192.168.1.10" />
                 </div>
                 <div className="space-y-2">
                   <Label>Endereço MAC</Label>
@@ -235,31 +256,34 @@ function TIAssetsPage() {
 
               <div className="space-y-2 pt-2">
                 <Label>Observações / Specs</Label>
-                <Input value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} placeholder="Histórico de reparo ou configuração..." />
+                <Input value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} placeholder="Especificações técnicas ou detalhes..." />
               </div>
 
               <Button type="submit" className="w-full mt-4" disabled={upsertAsset.isPending}>
-                {formData.id ? "Atualizar Alterações" : "Salvar no Inventário"}
+                {formData.id ? "Atualizar Ativo" : "Salvar Ativo"}
               </Button>
             </form>
           </SheetContent>
         </Sheet>
       </div>
 
-      {/* CARDS INDICADORES */}
+      {/* CARDS CONTADORES INDICADORES */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div onClick={() => setFilterStatus("todos")} className={`border rounded-lg p-4 bg-card cursor-pointer transition-all hover:border-primary/50 ${filterStatus === 'todos' ? 'ring-1 ring-primary border-primary' : ''}`}>
           <div className="flex justify-between items-center"><span className="text-sm text-muted-foreground font-medium">Total Geral</span><Server className="size-4 text-muted-foreground" /></div>
           <div className="text-2xl font-bold mt-2">{counters.total}</div>
         </div>
+        
         <div onClick={() => setFilterStatus("Em Uso")} className={`border rounded-lg p-4 bg-card cursor-pointer transition-all hover:border-blue-500/50 ${filterStatus === 'Em Uso' ? 'ring-1 ring-blue-500 border-blue-500' : ''}`}>
           <div className="flex justify-between items-center"><span className="text-sm text-muted-foreground font-medium">Em Operação</span><Activity className="size-4 text-blue-500" /></div>
           <div className="text-2xl font-bold mt-2 text-blue-500">{counters.emUso}</div>
         </div>
+        
         <div onClick={() => setFilterStatus("Manutenção")} className={`border rounded-lg p-4 bg-card cursor-pointer transition-all hover:border-amber-500/50 ${filterStatus === 'Manutenção' ? 'ring-1 ring-amber-500 border-amber-500' : ''}`}>
           <div className="flex justify-between items-center"><span className="text-sm text-muted-foreground font-medium">Em Manutenção</span><ShieldAlert className="size-4 text-amber-500" /></div>
           <div className="text-2xl font-bold mt-2 text-amber-500">{counters.manutencao}</div>
         </div>
+
         <div onClick={() => setFilterStatus("Backup")} className={`border rounded-lg p-4 bg-card cursor-pointer transition-all hover:border-indigo-500/50 ${filterStatus === 'Backup' ? 'ring-1 ring-indigo-500 border-indigo-500' : ''}`}>
           <div className="flex justify-between items-center"><span className="text-sm text-muted-foreground font-medium">Em Backup</span><Database className="size-4 text-indigo-500" /></div>
           <div className="text-2xl font-bold mt-2 text-indigo-500">{counters.backup}</div>
@@ -276,18 +300,18 @@ function TIAssetsPage() {
               <TableHead>Status</TableHead>
               <TableHead>Identificadores</TableHead>
               <TableHead>Endereço IP / MAC</TableHead>
-              <TableHead className="w-[120px]"></TableHead> {/* Alargado para caber dois botões */}
+              <TableHead className="w-[120px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow><TableCell colSpan={6}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
-            ) : filteredAssets.length === 0 ? (
+            ) : paginatedAssets.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">Nenhum ativo de TI encontrado.</TableCell>
               </TableRow>
             ) : (
-              filteredAssets.map((asset: any) => (
+              paginatedAssets.map((asset: any) => (
                 <TableRow key={asset.id}>
                   <TableCell>
                     <div className="font-medium text-foreground">{asset.name}</div>
@@ -315,7 +339,6 @@ function TIAssetsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      {/* NOVO BOTÃO DE EDITAÇÃO */}
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary" onClick={() => handleEdit(asset)} title="Editar dispositivo">
                         <Pencil className="size-3.5" />
                       </Button>
@@ -329,6 +352,39 @@ function TIAssetsPage() {
             )}
           </TableBody>
         </Table>
+
+        {/* COMPONENTE DE PAGINAÇÃO INTEGRADO NA BASE DA TABELA */}
+        <div className="flex items-center justify-between px-4 py-4 border-t bg-muted/20">
+          <div className="text-sm text-muted-foreground">
+            A mostrar de {filteredAssets.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} até{" "}
+            {Math.min(currentPage * pageSize, filteredAssets.length)} de{" "}
+            <span className="font-semibold">{filteredAssets.length}</span> ativos
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              Anterior
+            </Button>
+            
+            <div className="text-sm font-medium text-foreground">
+              Página {currentPage} de {totalPages || 1}
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages || totalPages === 0}
+            >
+              Seguinte
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
