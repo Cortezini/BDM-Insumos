@@ -583,7 +583,7 @@ function TIAssetsPage() {
                     <div className="font-medium text-foreground">{asset.name}</div>
                     <div
                       className="text-xs text-muted-foreground max-w-xs truncate"
-                      title={asset.notes}
+                      title={asset.notes ?? undefined}
                     >
                       {asset.notes || "Sem notas descritivas"}
                     </div>
@@ -599,7 +599,7 @@ function TIAssetsPage() {
                       <User className="size-3 text-primary" /> {asset.responsibleName}
                     </div>
                   </TableCell>
-                  <TableCell>{getStatusBadge(asset.status)}</TableCell>
+                  <TableCell>{getStatusBadge(asset.status ?? "")}</TableCell>
                   <TableCell className="text-xs space-y-0.5">
                     <div>
                       <span className="text-muted-foreground font-medium">S/N:</span>{" "}
