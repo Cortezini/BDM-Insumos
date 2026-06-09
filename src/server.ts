@@ -12,8 +12,19 @@ type RuntimeEnv = Record<string, unknown>;
 type BrasilApiCnpjPayload = Record<string, unknown>;
 
 type BrasilApiLookupResult =
-  | { ok: true; payload: BrasilApiCnpjPayload }
-  | { ok: false; status: number; message: string };
+  | { ok: true; payload: BrasilApiCnpjPayload; source: string }
+  | { ok: false; status: number; message: string; source: string };
+
+const CNPJ_PROVIDERS = [
+  {
+    name: "BrasilAPI",
+    url: (cnpj: string) => `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`,
+  },
+  {
+    name: "Minha Receita",
+    url: (cnpj: string) => `https://minhareceita.org/${cnpj}`,
+  },
+] as const;
 
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
@@ -86,7 +97,10 @@ function buildAddress(payload: BrasilApiCnpjPayload): string {
   return [firstLine, complement, neighborhood, cityState, cep].filter(Boolean).join(" - ");
 }
 
-function normalizeBrasilApiSupplier(payload: BrasilApiCnpjPayload): Record<string, unknown> {
+function normalizeBrasilApiSupplier(
+  payload: BrasilApiCnpjPayload,
+  source: string,
+): Record<string, unknown> {
   const phone = readString(payload, "ddd_telefone_1") || readString(payload, "ddd_telefone_2");
 
   return {
@@ -97,7 +111,7 @@ function normalizeBrasilApiSupplier(payload: BrasilApiCnpjPayload): Record<strin
     email: readString(payload, "email").toLowerCase(),
     address: buildAddress(payload),
     status: readString(payload, "descricao_situacao_cadastral"),
-    source: "BrasilAPI",
+    source,
   };
 }
 
@@ -114,37 +128,42 @@ function extractBrasilApiError(payload: unknown, body: string): string {
 async function fetchBrasilApiCnpj(cnpj: string): Promise<BrasilApiLookupResult> {
   let lastError: BrasilApiLookupResult | null = null;
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, {
-        cache: "no-store",
-        headers: {
-          accept: "application/json",
-          "cache-control": "no-cache",
-        },
-      });
-      const body = await response.text();
-      const payload = body ? (JSON.parse(body) as BrasilApiCnpjPayload) : null;
+  for (const provider of CNPJ_PROVIDERS) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const response = await fetch(provider.url(cnpj), {
+          cache: "no-store",
+          headers: {
+            accept: "application/json",
+            "cache-control": "no-cache",
+          },
+        });
+        const body = await response.text();
+        const payload = body ? (JSON.parse(body) as BrasilApiCnpjPayload) : null;
 
-      if (response.ok && payload) {
-        return { ok: true, payload };
+        if (response.ok && payload) {
+          return { ok: true, payload, source: provider.name };
+        }
+
+        lastError = {
+          ok: false,
+          status: response.status,
+          message: extractBrasilApiError(payload, body),
+          source: provider.name,
+        };
+
+        if (response.status < 500 && response.status !== 429) {
+          break;
+        }
+      } catch (error) {
+        lastError = {
+          ok: false,
+          status: 0,
+          message:
+            error instanceof Error ? error.message : `Falha de conexão com ${provider.name}.`,
+          source: provider.name,
+        };
       }
-
-      lastError = {
-        ok: false,
-        status: response.status,
-        message: extractBrasilApiError(payload, body),
-      };
-
-      if (response.status < 500 && response.status !== 429) {
-        break;
-      }
-    } catch (error) {
-      lastError = {
-        ok: false,
-        status: 0,
-        message: error instanceof Error ? error.message : "Falha de conexão com a BrasilAPI.",
-      };
     }
   }
 
@@ -152,7 +171,8 @@ async function fetchBrasilApiCnpj(cnpj: string): Promise<BrasilApiLookupResult> 
     lastError ?? {
       ok: false,
       status: 0,
-      message: "Resposta vazia da BrasilAPI.",
+      message: "Nenhum provedor respondeu à consulta.",
+      source: "Consulta CNPJ",
     }
   );
 }
@@ -218,15 +238,18 @@ async function handleCnpjLookup(request: Request, env: unknown): Promise<Respons
     const upstreamStatus = brasilApiResponse.status || "sem status";
     return jsonResponse(
       {
-        error: `BrasilAPI indisponível ou recusou a consulta (${upstreamStatus}). Tente novamente em instantes.`,
+        error: `Não foi possível consultar o CNPJ (${upstreamStatus}). Tente novamente em instantes.`,
         detail: brasilApiResponse.message,
+        source: brasilApiResponse.source,
         upstreamStatus: brasilApiResponse.status,
       },
       { status: 502 },
     );
   }
 
-  return jsonResponse(normalizeBrasilApiSupplier(brasilApiResponse.payload));
+  return jsonResponse(
+    normalizeBrasilApiSupplier(brasilApiResponse.payload, brasilApiResponse.source),
+  );
 }
 
 async function getServerEntry(): Promise<ServerEntry> {
