@@ -3,12 +3,28 @@
 export type Database = Record<string, unknown>;
 
 export type UserRole = "admin" | "operator" | "viewer";
+export type PermissionKey =
+  | "dashboard.view"
+  | "products.view"
+  | "movements.view"
+  | "movements.create_in"
+  | "movements.create_out"
+  | "suppliers.view"
+  | "quotations.view"
+  | "quotations.create"
+  | "assets.view"
+  | "people.view"
+  | "cost_centers.view"
+  | "locations.view"
+  | "reports.view"
+  | "settings.view";
 
 export interface Profile {
   id: string;
   email: string;
   full_name: string | null;
   role: UserRole;
+  permissions: PermissionKey[] | null;
   created_at: string;
 }
 

@@ -13,14 +13,22 @@ import { useAuth } from "@/lib/auth-context";
 import { currency, number, dateTimeBR, exportToCSV } from "@/lib/format";
 import { toast } from "sonner";
 import type {
-  StockMovement, Product, Supplier, Person, CostCenter, Location as Loc, MovementType,
+  StockMovement,
+  Product,
+  Supplier,
+  Person,
+  CostCenter,
+  Location as Loc,
+  MovementType,
 } from "@/lib/database.types";
 
 export const Route = createFileRoute("/_authenticated/movimentacoes")({ component: Page });
 
 function Page() {
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const canCreateIn = hasPermission("movements.create_in");
+  const canCreateOut = hasPermission("movements.create_out");
   const list = useList<StockMovement>(
     "stock_movements",
     "*, product:products(id, name, sku, unit, current_stock, avg_cost), supplier:suppliers(name), person:people(full_name), cost_center:cost_centers(name), location:locations(name)",
@@ -43,6 +51,12 @@ function Page() {
       if (!product) throw new Error("Produto não encontrado");
       const qty = Number(payload.quantity);
       if (!qty || qty <= 0) throw new Error("Informe uma quantidade válida");
+      if (type === "in" && !canCreateIn) {
+        throw new Error("Usuário sem permissão para registrar entradas.");
+      }
+      if (type === "out" && !canCreateOut) {
+        throw new Error("Usuário sem permissão para registrar saídas.");
+      }
       if (type === "out" && qty > Number(product.current_stock)) {
         throw new Error("Estoque insuficiente para esta saída");
       }
@@ -69,7 +83,8 @@ function Page() {
         type === "in" ? Number(product.current_stock) + qty : Number(product.current_stock) - qty;
       let newAvg = Number(product.avg_cost);
       if (type === "in" && movement.unit_cost && movement.unit_cost > 0) {
-        const totalValue = Number(product.current_stock) * Number(product.avg_cost) + qty * movement.unit_cost;
+        const totalValue =
+          Number(product.current_stock) * Number(product.avg_cost) + qty * movement.unit_cost;
         newAvg = newStock > 0 ? totalValue / newStock : movement.unit_cost;
       }
       const { error: upErr } = await db
@@ -182,12 +197,27 @@ function Page() {
             >
               <Download className="size-4 mr-2" /> Exportar
             </Button>
-            <Button variant="outline" onClick={() => { setType("out"); setOpen(true); }}>
-              <ArrowUpFromLine className="size-4 mr-2" /> Saída
-            </Button>
-            <Button onClick={() => { setType("in"); setOpen(true); }}>
-              <ArrowDownToLine className="size-4 mr-2" /> Entrada
-            </Button>
+            {canCreateOut && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setType("out");
+                  setOpen(true);
+                }}
+              >
+                <ArrowUpFromLine className="size-4 mr-2" /> Saída
+              </Button>
+            )}
+            {canCreateIn && (
+              <Button
+                onClick={() => {
+                  setType("in");
+                  setOpen(true);
+                }}
+              >
+                <ArrowDownToLine className="size-4 mr-2" /> Entrada
+              </Button>
+            )}
           </>
         }
       />
@@ -204,7 +234,12 @@ function Page() {
         data={rows}
         searchKeys={["reason"]}
         columns={[
-          { key: "movement_date", header: "Data", render: (r) => dateTimeBR(r.movement_date), sortValue: (r) => r.movement_date },
+          {
+            key: "movement_date",
+            header: "Data",
+            render: (r) => dateTimeBR(r.movement_date),
+            sortValue: (r) => r.movement_date,
+          },
           {
             key: "type",
             header: "Tipo",
@@ -216,16 +251,36 @@ function Page() {
                     : "bg-destructive/15 text-destructive"
                 }`}
               >
-                {r.type === "in" ? <ArrowDownToLine className="size-3" /> : <ArrowUpFromLine className="size-3" />}
+                {r.type === "in" ? (
+                  <ArrowDownToLine className="size-3" />
+                ) : (
+                  <ArrowUpFromLine className="size-3" />
+                )}
                 {r.type === "in" ? "Entrada" : "Saída"}
               </span>
             ),
           },
           { key: "product", header: "Produto", render: (r) => r.product?.name ?? "—" },
-          { key: "quantity", header: "Qtd", render: (r) => number(Number(r.quantity)), className: "text-right tabular-nums" },
-          { key: "unit_cost", header: "Custo unit.", render: (r) => (r.unit_cost ? currency(Number(r.unit_cost)) : "—") },
-          { key: "ref", header: "Origem / Destino", render: (r) =>
-            r.type === "in" ? r.supplier?.name ?? "—" : `${r.person?.full_name ?? "—"}${r.cost_center?.name ? ` · ${r.cost_center.name}` : ""}`,
+          {
+            key: "quantity",
+            header: "Qtd",
+            render: (r) => number(Number(r.quantity)),
+            className: "text-right tabular-nums",
+          },
+          {
+            key: "unit_cost",
+            header: "Custo unit.",
+            render: (r) => (r.unit_cost ? currency(Number(r.unit_cost)) : "—"),
+          },
+          {
+            key: "ref",
+            header: "Origem / Destino",
+            render: (r) =>
+              r.type === "in"
+                ? (r.supplier?.name ?? "—")
+                : `${r.person?.full_name ?? "—"}${
+                    r.cost_center?.name ? ` · ${r.cost_center.name}` : ""
+                  }`,
           },
           { key: "reason", header: "Motivo" },
         ]}
@@ -235,11 +290,17 @@ function Page() {
         open={open}
         onOpenChange={setOpen}
         title={type === "in" ? "Nova entrada" : "Nova saída"}
-        description={type === "in" ? "Registre uma entrada de produto no estoque." : "Registre uma saída do estoque."}
+        description={
+          type === "in"
+            ? "Registre uma entrada de produto no estoque."
+            : "Registre uma saída do estoque."
+        }
         fields={type === "in" ? inFields : outFields}
         initial={{ movement_date: new Date().toISOString().slice(0, 10) }}
         submitting={create.isPending}
-        onSubmit={async (v) => { await create.mutateAsync(v); }}
+        onSubmit={async (v) => {
+          await create.mutateAsync(v);
+        }}
       />
     </div>
   );

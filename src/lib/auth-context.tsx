@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useNavigate } from "@tanstack/react-router";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase, db } from "./supabase";
-import type { Profile, UserRole } from "./database.types";
+import type { PermissionKey, Profile, UserRole } from "./database.types";
+import { can, getDefaultRoute } from "./permissions";
 
 interface AuthCtx {
   user: User | null;
@@ -12,6 +13,7 @@ interface AuthCtx {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasRole: (...roles: UserRole[]) => boolean;
+  hasPermission: (permission: PermissionKey) => boolean;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -41,14 +43,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function loadProfile(uid: string) {
     const { data } = await db.from("profiles").select("*").eq("id", uid).maybeSingle();
-    setProfile((data as Profile | null) ?? null);
+    const nextProfile = (data as Profile | null) ?? null;
+    setProfile(nextProfile);
     setLoading(false);
+    return nextProfile;
   }
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    navigate({ to: "/" });
+    const nextProfile = data.user ? await loadProfile(data.user.id) : null;
+    navigate({ to: getDefaultRoute(nextProfile) ?? "/" });
   };
 
   const signOut = async () => {
@@ -57,10 +62,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const hasRole = (...roles: UserRole[]) => !!profile && roles.includes(profile.role);
+  const hasPermission = (permission: PermissionKey) => can(profile, permission);
 
   return (
     <Ctx.Provider
-      value={{ user: session?.user ?? null, session, profile, loading, signIn, signOut, hasRole }}
+      value={{
+        user: session?.user ?? null,
+        session,
+        profile,
+        loading,
+        signIn,
+        signOut,
+        hasRole,
+        hasPermission,
+      }}
     >
       {children}
     </Ctx.Provider>

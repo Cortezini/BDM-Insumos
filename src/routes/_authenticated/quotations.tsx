@@ -1,7 +1,10 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, ArrowRightLeft, ExternalLink } from "lucide-react";
+import { Plus, ArrowRightLeft, ExternalLink, Check, X } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useList, useUpsert, useDelete } from "@/lib/crud";
+import { db } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth-context";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/quotations")({
@@ -42,6 +46,11 @@ type QuoteRecord = {
   supplier_id: string;
   price: number | string;
   purchase_link: string | null;
+  status: "pending" | "approved" | "rejected";
+  requested_by: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
   created_at: string;
 };
 
@@ -55,11 +64,6 @@ type SupplierRecord = {
   name: string | null;
 };
 
-type EnrichedQuoteRecord = QuoteRecord & {
-  productName: string;
-  supplierName: string;
-};
-
 type SupplierStats = {
   name: string;
   total: number;
@@ -70,6 +74,10 @@ type SupplierStats = {
 };
 
 function QuotationsPage() {
+  const qc = useQueryClient();
+  const { hasRole, hasPermission } = useAuth();
+  const canCreateQuote = hasPermission("quotations.create");
+  const canReviewQuotes = hasRole("admin");
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState(initialQuoteForm);
   const [analysisProductId, setAnalysisProductId] = useState<string>("all");
@@ -80,6 +88,24 @@ function QuotationsPage() {
 
   const upsertQuote = useUpsert("quotations");
   const deleteQuote = useDelete("quotations");
+
+  const reviewQuote = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
+      const { error } = await db
+        .from("quotations")
+        .update({
+          status,
+          review_notes: status === "approved" ? null : "Reprovada pelo administrador",
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["quotations"] });
+      toast.success(variables.status === "approved" ? "Cotação aprovada" : "Cotação reprovada");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   // 1. Enriquece as cotações com os nomes reais (cruzando os IDs)
   const enrichedQuotes = useMemo(() => {
@@ -102,7 +128,9 @@ function QuotationsPage() {
   const supplierComparison = useMemo(() => {
     if (analysisProductId === "all" || !enrichedQuotes.length) return null;
 
-    const productQuotes = enrichedQuotes.filter((q) => q.product_id === analysisProductId);
+    const productQuotes = enrichedQuotes.filter(
+      (q) => q.product_id === analysisProductId && q.status === "approved",
+    );
     if (productQuotes.length === 0) return [];
 
     const stats: Record<string, SupplierStats> = {};
@@ -137,13 +165,19 @@ function QuotationsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!canCreateQuote) {
+        toast.error("Usuário sem permissão para criar cotações.");
+        return;
+      }
+
       await upsertQuote.mutateAsync({
         product_id: formData.product_id,
         supplier_id: formData.supplier_id,
         price: parseFloat(formData.price),
         purchase_link: formData.purchase_link.trim() || null,
+        status: "pending",
       });
-      toast.success("Cotação registrada!");
+      toast.success("Cotação registrada para aprovação!");
       setIsOpen(false);
       setFormData(initialQuoteForm);
     } catch (error) {
@@ -161,6 +195,25 @@ function QuotationsPage() {
     return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   };
 
+  const getStatusBadge = (status: QuoteRecord["status"]) => {
+    const variants: Record<QuoteRecord["status"], string> = {
+      pending: "bg-amber-500/10 text-amber-600 hover:bg-amber-500/10 border-amber-500/20",
+      approved: "bg-green-500/10 text-green-600 hover:bg-green-500/10 border-green-500/20",
+      rejected: "bg-destructive/10 text-destructive hover:bg-destructive/10 border-destructive/20",
+    };
+    const labels: Record<QuoteRecord["status"], string> = {
+      pending: "Pendente",
+      approved: "Aprovada",
+      rejected: "Reprovada",
+    };
+
+    return (
+      <Badge variant="outline" className={variants[status]}>
+        {labels[status]}
+      </Badge>
+    );
+  };
+
   const isLoading = loadingQuotes || loadingProducts || loadingSuppliers;
 
   return (
@@ -174,11 +227,13 @@ function QuotationsPage() {
         </div>
 
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> Nova Cotação
-            </Button>
-          </SheetTrigger>
+          {canCreateQuote && (
+            <SheetTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> Nova Cotação
+              </Button>
+            </SheetTrigger>
+          )}
           <SheetContent>
             <SheetHeader>
               <SheetTitle>Registrar Preço</SheetTitle>
@@ -277,11 +332,11 @@ function QuotationsPage() {
 
         {analysisProductId === "all" ? (
           <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-md border border-dashed">
-            Selecione um produto acima para ver o ranking de fornecedores e médias.
+            Selecione um produto acima para ver o ranking de fornecedores e médias aprovadas.
           </div>
         ) : supplierComparison?.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-md border border-dashed">
-            Nenhuma cotação registrada para este produto ainda.
+            Nenhuma cotação aprovada para este produto ainda.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -343,21 +398,22 @@ function QuotationsPage() {
               <TableHead>Data</TableHead>
               <TableHead>Produto</TableHead>
               <TableHead>Fornecedor</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="text-right">Preço Cotado</TableHead>
               <TableHead>Link</TableHead>
-              <TableHead className="w-[80px]"></TableHead>
+              <TableHead className="w-[180px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6}>
+                <TableCell colSpan={7}>
                   <Skeleton className="h-10 w-full" />
                 </TableCell>
               </TableRow>
             ) : enrichedQuotes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
                   Nenhuma cotação encontrada.
                 </TableCell>
               </TableRow>
@@ -370,6 +426,7 @@ function QuotationsPage() {
                     <TableCell>{new Date(quote.created_at).toLocaleDateString("pt-BR")}</TableCell>
                     <TableCell className="font-medium">{quote.productName}</TableCell>
                     <TableCell>{quote.supplierName}</TableCell>
+                    <TableCell>{getStatusBadge(quote.status)}</TableCell>
                     <TableCell className="text-right font-medium">
                       {formatBRL(Number(quote.price))}
                     </TableCell>
@@ -388,14 +445,46 @@ function QuotationsPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive h-8 px-2 text-xs"
-                        onClick={() => deleteQuote.mutateAsync(quote.id)}
-                      >
-                        Excluir
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        {canReviewQuotes && quote.status === "pending" && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-xs text-green-600 hover:text-green-600"
+                              disabled={reviewQuote.isPending}
+                              onClick={() =>
+                                reviewQuote.mutate({ id: quote.id, status: "approved" })
+                              }
+                            >
+                              <Check className="mr-1 size-3" />
+                              Aprovar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-xs text-destructive hover:text-destructive"
+                              disabled={reviewQuote.isPending}
+                              onClick={() =>
+                                reviewQuote.mutate({ id: quote.id, status: "rejected" })
+                              }
+                            >
+                              <X className="mr-1 size-3" />
+                              Reprovar
+                            </Button>
+                          </>
+                        )}
+                        {canReviewQuotes && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive h-8 px-2 text-xs"
+                            onClick={() => deleteQuote.mutateAsync(quote.id)}
+                          >
+                            Excluir
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

@@ -5,20 +5,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
+import { getDefaultRoute } from "@/lib/permissions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth/login")({ component: LoginPage });
 
 function LoginPage() {
-  const { signIn, user } = useAuth();
+  const { signIn, user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user) navigate({ to: "/" });
-  }, [user, navigate]);
+    if (user && !authLoading) navigate({ to: getDefaultRoute(profile) ?? "/" });
+  }, [user, profile, authLoading, navigate]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +45,8 @@ function LoginPage() {
         <div className="space-y-3">
           <h1 className="text-4xl font-semibold leading-tight">Gestão de Insumos</h1>
           <p className="text-primary-foreground/80 max-w-md">
-            Controle produtos, fornecedores, movimentações e relatórios em um único lugar — pronto para sua operação.
+            Controle produtos, fornecedores, movimentações e relatórios em um único lugar — pronto
+            para sua operação.
           </p>
         </div>
         <div className="text-xs text-primary-foreground/70">© {new Date().getFullYear()} BDM</div>
@@ -57,7 +59,13 @@ function LoginPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
-            <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Senha</Label>
