@@ -1,4 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import {
   Dialog,
   DialogContent,
@@ -20,11 +27,36 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
+export type RecordModalValues = Record<string, unknown>;
+export type RecordModalSetValues = Dispatch<SetStateAction<RecordModalValues>>;
+
+type FieldAction = {
+  label: string;
+  loadingLabel?: string;
+  loading?: boolean;
+  onClick: (values: RecordModalValues, setValues: RecordModalSetValues) => Promise<void> | void;
+};
+
 export type Field =
-  | { name: string; label: string; type: "text" | "email" | "number" | "date"; placeholder?: string; required?: boolean; step?: string }
+  | {
+      name: string;
+      label: string;
+      type: "text" | "email" | "number" | "date";
+      placeholder?: string;
+      required?: boolean;
+      step?: string;
+      action?: FieldAction;
+    }
   | { name: string; label: string; type: "textarea"; required?: boolean }
   | { name: string; label: string; type: "switch" }
-  | { name: string; label: string; type: "select"; options: { value: string; label: string }[]; required?: boolean; allowEmpty?: boolean };
+  | {
+      name: string;
+      label: string;
+      type: "select";
+      options: { value: string; label: string }[];
+      required?: boolean;
+      allowEmpty?: boolean;
+    };
 
 interface Props {
   open: boolean;
@@ -32,20 +64,35 @@ interface Props {
   title: string;
   description?: string;
   fields: Field[];
-  initial?: Record<string, unknown> | null;
-  onSubmit: (values: Record<string, unknown>) => Promise<void> | void;
+  initial?: RecordModalValues | null;
+  onSubmit: (values: RecordModalValues) => Promise<void> | void;
   submitting?: boolean;
   children?: ReactNode;
 }
 
-export function RecordModal({ open, onOpenChange, title, description, fields, initial, onSubmit, submitting, children }: Props) {
-  const [values, setValues] = useState<Record<string, unknown>>({});
+export function RecordModal({
+  open,
+  onOpenChange,
+  title,
+  description,
+  fields,
+  initial,
+  onSubmit,
+  submitting,
+  children,
+}: Props) {
+  const [values, setValues] = useState<RecordModalValues>({});
+  const fieldsRef = useRef(fields);
+
+  useEffect(() => {
+    fieldsRef.current = fields;
+  }, [fields]);
 
   useEffect(() => {
     if (open) {
-      const init: Record<string, unknown> = {};
-      const src = (initial ?? {}) as Record<string, unknown>;
-      fields.forEach((f) => {
+      const init: RecordModalValues = {};
+      const src = (initial ?? {}) as RecordModalValues;
+      fieldsRef.current.forEach((f) => {
         const v = src[f.name];
         if (f.type === "switch") init[f.name] = v ?? true;
         else init[f.name] = v ?? "";
@@ -53,7 +100,7 @@ export function RecordModal({ open, onOpenChange, title, description, fields, in
       if (src.id) init.id = src.id;
       setValues(init);
     }
-  }, [open, initial, fields]);
+  }, [open, initial]);
 
   const set = (k: string, v: unknown) => setValues((s) => ({ ...s, [k]: v }));
 
@@ -90,7 +137,10 @@ export function RecordModal({ open, onOpenChange, title, description, fields, in
                     rows={3}
                   />
                 ) : f.type === "select" ? (
-                  <Select value={(values[f.name] as string) ?? ""} onValueChange={(v) => set(f.name, v)}>
+                  <Select
+                    value={(values[f.name] as string) ?? ""}
+                    onValueChange={(v) => set(f.name, v)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
@@ -106,17 +156,34 @@ export function RecordModal({ open, onOpenChange, title, description, fields, in
                 ) : f.type === "switch" ? (
                   <div className="flex items-center gap-2 h-9">
                     <Switch checked={!!values[f.name]} onCheckedChange={(v) => set(f.name, v)} />
-                    <span className="text-sm text-muted-foreground">{values[f.name] ? "Ativo" : "Inativo"}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {values[f.name] ? "Ativo" : "Inativo"}
+                    </span>
                   </div>
                 ) : (
-                  <Input
-                    type={f.type}
-                    step={f.type === "number" ? f.step ?? "any" : undefined}
-                    placeholder={f.placeholder}
-                    required={f.required}
-                    value={(values[f.name] as string) ?? ""}
-                    onChange={(e) => set(f.name, e.target.value)}
-                  />
+                  <div className={f.action ? "flex gap-2" : ""}>
+                    <Input
+                      type={f.type}
+                      step={f.type === "number" ? (f.step ?? "any") : undefined}
+                      placeholder={f.placeholder}
+                      required={f.required}
+                      value={(values[f.name] as string) ?? ""}
+                      onChange={(e) => set(f.name, e.target.value)}
+                    />
+                    {f.action && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="shrink-0"
+                        disabled={submitting || f.action.loading}
+                        onClick={() => void f.action?.onClick(values, setValues)}
+                      >
+                        {f.action.loading
+                          ? (f.action.loadingLabel ?? "Carregando...")
+                          : f.action.label}
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
