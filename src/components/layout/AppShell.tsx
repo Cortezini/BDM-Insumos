@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme";
-import { can, getDefaultRoute, getRoutePermission } from "@/lib/permissions";
+import { canAny, getDefaultRoute, getRoutePermissions } from "@/lib/permissions";
 import type { PermissionKey } from "@/lib/database.types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,7 @@ const nav: Array<{
   to: string;
   label: string;
   icon: typeof LayoutDashboard;
-  permission: PermissionKey;
+  permission: PermissionKey | PermissionKey[];
 }> = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, permission: "dashboard.view" },
   { to: "/produtos", label: "Produtos", icon: Package, permission: "products.view" },
@@ -38,7 +38,7 @@ const nav: Array<{
     to: "/movimentacoes",
     label: "Movimentações",
     icon: ArrowLeftRight,
-    permission: "movements.view",
+    permission: ["movements.view", "movements.view_in", "movements.view_out"],
   },
   { to: "/fornecedores", label: "Fornecedores", icon: Truck, permission: "suppliers.view" },
   { to: "/quotations", label: "Cotações", icon: Calculator, permission: "quotations.view" },
@@ -59,10 +59,10 @@ export function AppShell() {
   const { profile, signOut } = useAuth();
   const { theme, toggle } = useTheme();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const routePermission = getRoutePermission(pathname);
-  const hasRouteAccess = !routePermission || can(profile, routePermission);
+  const routePermissions = getRoutePermissions(pathname);
+  const hasRouteAccess = !routePermissions || canAny(profile, routePermissions);
   const defaultRoute = getDefaultRoute(profile);
-  const visibleNav = nav.filter((item) => can(profile, item.permission));
+  const visibleNav = nav.filter((item) => canAny(profile, item.permission));
 
   return (
     <div className="min-h-screen flex w-full bg-background text-foreground">

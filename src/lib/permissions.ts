@@ -6,10 +6,14 @@ export type PermissionDefinition = {
   group: string;
 };
 
+type PermissionRequirement = PermissionKey | readonly PermissionKey[];
+
 export const PERMISSIONS: PermissionDefinition[] = [
   { key: "dashboard.view", label: "Dashboard", group: "Telas" },
   { key: "products.view", label: "Produtos", group: "Telas" },
-  { key: "movements.view", label: "Movimentações", group: "Telas" },
+  { key: "movements.view", label: "Ver todas movimentações", group: "Movimentações" },
+  { key: "movements.view_in", label: "Ver entradas", group: "Movimentações" },
+  { key: "movements.view_out", label: "Ver saídas", group: "Movimentações" },
   { key: "suppliers.view", label: "Fornecedores", group: "Telas" },
   { key: "quotations.view", label: "Cotações", group: "Telas" },
   { key: "assets.view", label: "Ativos de TI", group: "Telas" },
@@ -56,61 +60,61 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Exclude<UserRole, "admin">, Permis
 };
 
 export const ROUTE_PERMISSIONS = [
-  { path: "/", match: (pathname: string) => pathname === "/", key: "dashboard.view" },
+  { path: "/", match: (pathname: string) => pathname === "/", permissions: "dashboard.view" },
   {
     path: "/produtos",
     match: (pathname: string) => pathname.startsWith("/produtos"),
-    key: "products.view",
+    permissions: "products.view",
   },
   {
     path: "/movimentacoes",
     match: (pathname: string) => pathname.startsWith("/movimentacoes"),
-    key: "movements.view",
+    permissions: ["movements.view", "movements.view_in", "movements.view_out"],
   },
   {
     path: "/fornecedores",
     match: (pathname: string) => pathname.startsWith("/fornecedores"),
-    key: "suppliers.view",
+    permissions: "suppliers.view",
   },
   {
     path: "/quotations",
     match: (pathname: string) => pathname.startsWith("/quotations"),
-    key: "quotations.view",
+    permissions: "quotations.view",
   },
   {
     path: "/assets",
     match: (pathname: string) => pathname.startsWith("/assets"),
-    key: "assets.view",
+    permissions: "assets.view",
   },
   {
     path: "/pessoas",
     match: (pathname: string) => pathname.startsWith("/pessoas"),
-    key: "people.view",
+    permissions: "people.view",
   },
   {
     path: "/centros-de-custo",
     match: (pathname: string) => pathname.startsWith("/centros-de-custo"),
-    key: "cost_centers.view",
+    permissions: "cost_centers.view",
   },
   {
     path: "/localizacoes",
     match: (pathname: string) => pathname.startsWith("/localizacoes"),
-    key: "locations.view",
+    permissions: "locations.view",
   },
   {
     path: "/relatorios",
     match: (pathname: string) => pathname.startsWith("/relatorios"),
-    key: "reports.view",
+    permissions: "reports.view",
   },
   {
     path: "/configuracoes",
     match: (pathname: string) => pathname.startsWith("/configuracoes"),
-    key: "settings.view",
+    permissions: "settings.view",
   },
 ] as const satisfies ReadonlyArray<{
   path: string;
   match: (pathname: string) => boolean;
-  key: PermissionKey;
+  permissions: PermissionRequirement;
 }>;
 
 export type AppRoutePath = (typeof ROUTE_PERMISSIONS)[number]["path"];
@@ -121,11 +125,16 @@ export function can(profile: Profile | null, permission: PermissionKey) {
   return (profile.permissions ?? []).includes(permission);
 }
 
-export function getRoutePermission(pathname: string) {
+export function canAny(profile: Profile | null, permissions: PermissionRequirement) {
+  const required = Array.isArray(permissions) ? permissions : [permissions];
+  return required.some((permission) => can(profile, permission));
+}
+
+export function getRoutePermissions(pathname: string) {
   const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  return ROUTE_PERMISSIONS.find((route) => route.match(normalized))?.key ?? null;
+  return ROUTE_PERMISSIONS.find((route) => route.match(normalized))?.permissions ?? null;
 }
 
 export function getDefaultRoute(profile: Profile | null): AppRoutePath | null {
-  return ROUTE_PERMISSIONS.find((route) => can(profile, route.key))?.path ?? null;
+  return ROUTE_PERMISSIONS.find((route) => canAny(profile, route.permissions))?.path ?? null;
 }

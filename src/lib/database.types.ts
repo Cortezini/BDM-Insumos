@@ -7,6 +7,8 @@ export type PermissionKey =
   | "dashboard.view"
   | "products.view"
   | "movements.view"
+  | "movements.view_in"
+  | "movements.view_out"
   | "movements.create_in"
   | "movements.create_out"
   | "suppliers.view"

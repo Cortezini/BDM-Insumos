@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Save } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { db } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
@@ -27,6 +28,15 @@ function Page() {
   const qc = useQueryClient();
   const { profile, hasRole } = useAuth();
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
+  const [expandedUsers, setExpandedUsers] = useState<string[]>([]);
+  const permissionGroups = useMemo(
+    () =>
+      Array.from(new Set(PERMISSIONS.map((permission) => permission.group))).map((group) => ({
+        group,
+        permissions: PERMISSIONS.filter((permission) => permission.group === group),
+      })),
+    [],
+  );
 
   const users = useQuery<Profile[]>({
     queryKey: ["profiles", "list"],
@@ -90,6 +100,12 @@ function Page() {
     updatePermissions.mutate({ id: userProfile.id, permissions: next });
   };
 
+  const toggleExpandedUser = (id: string) => {
+    setExpandedUsers((current) =>
+      current.includes(id) ? current.filter((userId) => userId !== id) : [...current, id],
+    );
+  };
+
   return (
     <div>
       <PageHeader title="Configurações" description="Perfil e gestão de usuários." />
@@ -130,57 +146,103 @@ function Page() {
               Atribua permissões aos usuários cadastrados.
             </p>
             <div className="space-y-2">
-              {users.data?.map((u) => (
-                <div key={u.id} className="p-3 rounded-md border border-border">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{u.full_name ?? u.email}</div>
-                      <div className="text-xs text-muted-foreground truncate">{u.email}</div>
-                    </div>
-                    <Select
-                      value={u.role}
-                      onValueChange={(v) => updateRole.mutate({ id: u.id, role: v as UserRole })}
-                    >
-                      <SelectTrigger className="w-36">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Administrador</SelectItem>
-                        <SelectItem value="operator">Operador</SelectItem>
-                        <SelectItem value="viewer">Visualizador</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              {users.data?.map((u) => {
+                const isExpanded = expandedUsers.includes(u.id);
+                const permissionCount =
+                  u.role === "admin" ? "Acesso total" : `${u.permissions?.length ?? 0} permissões`;
 
-                  {u.role === "admin" ? (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Administradores têm acesso total e aprovam cotações.
-                    </p>
-                  ) : (
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {PERMISSIONS.map((permission) => {
-                        const checked = (u.permissions ?? []).includes(permission.key);
+                return (
+                  <Collapsible
+                    key={u.id}
+                    open={isExpanded}
+                    onOpenChange={() => toggleExpandedUser(u.id)}
+                    className="rounded-md border border-border"
+                  >
+                    <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+                      <CollapsibleTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">
+                              {u.full_name ?? u.email}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                          </div>
+                        </button>
+                      </CollapsibleTrigger>
 
-                        return (
-                          <label
-                            key={permission.key}
-                            className="flex items-center gap-2 text-xs rounded-md border border-border px-2 py-2"
-                          >
-                            <Checkbox
-                              checked={checked}
-                              disabled={updatePermissions.isPending}
-                              onCheckedChange={(value) =>
-                                togglePermission(u, permission.key, value === true)
-                              }
-                            />
-                            <span className="leading-tight">{permission.label}</span>
-                          </label>
-                        );
-                      })}
+                      <div className="flex items-center gap-2 sm:ml-auto">
+                        <Badge variant="outline" className="whitespace-nowrap">
+                          {permissionCount}
+                        </Badge>
+                        <Select
+                          value={u.role}
+                          onValueChange={(v) =>
+                            updateRole.mutate({ id: u.id, role: v as UserRole })
+                          }
+                        >
+                          <SelectTrigger className="w-36">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Administrador</SelectItem>
+                            <SelectItem value="operator">Operador</SelectItem>
+                            <SelectItem value="viewer">Visualizador</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    <CollapsibleContent>
+                      <div className="border-t border-border p-3">
+                        {u.role === "admin" ? (
+                          <p className="text-xs text-muted-foreground">
+                            Administradores têm acesso total e aprovam cotações.
+                          </p>
+                        ) : (
+                          <div className="space-y-4">
+                            {permissionGroups.map(({ group, permissions }) => (
+                              <div key={group}>
+                                <div className="mb-2 text-xs font-medium text-muted-foreground">
+                                  {group}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {permissions.map((permission) => {
+                                    const checked = (u.permissions ?? []).includes(permission.key);
+
+                                    return (
+                                      <label
+                                        key={permission.key}
+                                        className="flex items-center gap-2 text-xs rounded-md border border-border px-2 py-2"
+                                      >
+                                        <Checkbox
+                                          checked={checked}
+                                          disabled={updatePermissions.isPending}
+                                          onCheckedChange={(value) =>
+                                            togglePermission(u, permission.key, value === true)
+                                          }
+                                        />
+                                        <span className="leading-tight">{permission.label}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
               {users.data?.length === 0 && (
                 <p className="text-sm text-muted-foreground">Nenhum usuário ainda.</p>
               )}

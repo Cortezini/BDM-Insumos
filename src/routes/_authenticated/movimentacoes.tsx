@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Download, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,7 +8,7 @@ import { DataTable } from "@/components/shared/DataTable";
 import { RecordModal, type Field } from "@/components/shared/RecordModal";
 import { useList } from "@/lib/crud";
 import { db } from "@/lib/supabase";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { currency, number, dateTimeBR, exportToCSV } from "@/lib/format";
 import { toast } from "sonner";
@@ -27,13 +27,32 @@ export const Route = createFileRoute("/_authenticated/movimentacoes")({ componen
 function Page() {
   const qc = useQueryClient();
   const { user, hasPermission } = useAuth();
+  const canViewAll = hasPermission("movements.view");
+  const canViewIn = canViewAll || hasPermission("movements.view_in");
+  const canViewOut = canViewAll || hasPermission("movements.view_out");
   const canCreateIn = hasPermission("movements.create_in");
   const canCreateOut = hasPermission("movements.create_out");
-  const list = useList<StockMovement>(
-    "stock_movements",
-    "*, product:products(id, name, sku, unit, current_stock, avg_cost), supplier:suppliers(name), person:people(full_name), cost_center:cost_centers(name), location:locations(name)",
-    "movement_date",
-  );
+  const allowedTypes = useMemo<MovementType[]>(() => {
+    const types: MovementType[] = [];
+    if (canViewIn) types.push("in");
+    if (canViewOut) types.push("out");
+    return types;
+  }, [canViewIn, canViewOut]);
+  const list = useQuery<StockMovement[]>({
+    queryKey: ["stock_movements", "list", allowedTypes.join(",")],
+    enabled: allowedTypes.length > 0,
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("stock_movements")
+        .select(
+          "*, product:products(id, name, sku, unit, current_stock, avg_cost), supplier:suppliers(name), person:people(full_name), cost_center:cost_centers(name), location:locations(name)",
+        )
+        .in("type", allowedTypes)
+        .order("movement_date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as StockMovement[];
+    },
+  });
   const products = useList<Product>("products", "*", "name");
   const suppliers = useList<Supplier>("suppliers", "*", "name");
   const people = useList<Person>("people", "*", "full_name");
@@ -43,6 +62,24 @@ function Page() {
   const [filter, setFilter] = useState<"all" | MovementType>("all");
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<MovementType>("in");
+  const defaultFilter: "all" | MovementType =
+    canViewIn && canViewOut ? "all" : canViewIn ? "in" : canViewOut ? "out" : "all";
+
+  useEffect(() => {
+    if (filter === "all" && !(canViewIn && canViewOut)) {
+      setFilter(defaultFilter);
+      return;
+    }
+
+    if (filter === "in" && !canViewIn) {
+      setFilter(defaultFilter);
+      return;
+    }
+
+    if (filter === "out" && !canViewOut) {
+      setFilter(defaultFilter);
+    }
+  }, [canViewIn, canViewOut, defaultFilter, filter]);
 
   const create = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
@@ -224,9 +261,9 @@ function Page() {
 
       <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)} className="mb-4">
         <TabsList>
-          <TabsTrigger value="all">Todas</TabsTrigger>
-          <TabsTrigger value="in">Entradas</TabsTrigger>
-          <TabsTrigger value="out">Saídas</TabsTrigger>
+          {canViewIn && canViewOut && <TabsTrigger value="all">Todas</TabsTrigger>}
+          {canViewIn && <TabsTrigger value="in">Entradas</TabsTrigger>}
+          {canViewOut && <TabsTrigger value="out">Saídas</TabsTrigger>}
         </TabsList>
       </Tabs>
 
