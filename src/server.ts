@@ -11,6 +11,10 @@ type RuntimeEnv = Record<string, unknown>;
 
 type BrasilApiCnpjPayload = Record<string, unknown>;
 
+type BrasilApiLookupResult =
+  | { ok: true; payload: BrasilApiCnpjPayload }
+  | { ok: false; status: number; message: string };
+
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
 function jsonResponse(payload: Record<string, unknown>, init?: ResponseInit): Response {
@@ -97,6 +101,62 @@ function normalizeBrasilApiSupplier(payload: BrasilApiCnpjPayload): Record<strin
   };
 }
 
+function extractBrasilApiError(payload: unknown, body: string): string {
+  if (payload && typeof payload === "object") {
+    const fields = payload as Record<string, unknown>;
+    const message = fields.message ?? fields.error ?? fields.name;
+    if (typeof message === "string" && message.trim()) return message.trim();
+  }
+
+  return body.trim().slice(0, 180);
+}
+
+async function fetchBrasilApiCnpj(cnpj: string): Promise<BrasilApiLookupResult> {
+  let lastError: BrasilApiLookupResult | null = null;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, {
+        cache: "no-store",
+        headers: {
+          accept: "application/json",
+          "cache-control": "no-cache",
+        },
+      });
+      const body = await response.text();
+      const payload = body ? (JSON.parse(body) as BrasilApiCnpjPayload) : null;
+
+      if (response.ok && payload) {
+        return { ok: true, payload };
+      }
+
+      lastError = {
+        ok: false,
+        status: response.status,
+        message: extractBrasilApiError(payload, body),
+      };
+
+      if (response.status < 500 && response.status !== 429) {
+        break;
+      }
+    } catch (error) {
+      lastError = {
+        ok: false,
+        status: 0,
+        message: error instanceof Error ? error.message : "Falha de conexão com a BrasilAPI.",
+      };
+    }
+  }
+
+  return (
+    lastError ?? {
+      ok: false,
+      status: 0,
+      message: "Resposta vazia da BrasilAPI.",
+    }
+  );
+}
+
 async function validateSupabaseSession(request: Request, env: unknown): Promise<boolean> {
   const authorization = request.headers.get("authorization");
   if (!authorization?.startsWith("Bearer ")) return false;
@@ -148,23 +208,25 @@ async function handleCnpjLookup(request: Request, env: unknown): Promise<Respons
     return jsonResponse({ error: "Informe um CNPJ com 14 dígitos." }, { status: 400 });
   }
 
-  const brasilApiResponse = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, {
-    headers: { accept: "application/json" },
-  });
-  const payload = (await brasilApiResponse.json().catch(() => null)) as BrasilApiCnpjPayload | null;
+  const brasilApiResponse = await fetchBrasilApiCnpj(cnpj);
 
-  if (brasilApiResponse.status === 404) {
+  if (!brasilApiResponse.ok && brasilApiResponse.status === 404) {
     return jsonResponse({ error: "CNPJ não encontrado na BrasilAPI." }, { status: 404 });
   }
 
-  if (!brasilApiResponse.ok || !payload) {
+  if (!brasilApiResponse.ok) {
+    const upstreamStatus = brasilApiResponse.status || "sem status";
     return jsonResponse(
-      { error: "Não foi possível consultar o CNPJ na BrasilAPI agora." },
+      {
+        error: `BrasilAPI indisponível ou recusou a consulta (${upstreamStatus}). Tente novamente em instantes.`,
+        detail: brasilApiResponse.message,
+        upstreamStatus: brasilApiResponse.status,
+      },
       { status: 502 },
     );
   }
 
-  return jsonResponse(normalizeBrasilApiSupplier(payload));
+  return jsonResponse(normalizeBrasilApiSupplier(brasilApiResponse.payload));
 }
 
 async function getServerEntry(): Promise<ServerEntry> {
