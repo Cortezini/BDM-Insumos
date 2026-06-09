@@ -19,6 +19,7 @@ import {
   Calculator,
   Network,
   Menu,
+  ScrollText,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme";
@@ -62,6 +63,7 @@ const nav: Array<{
   { to: "/localizacoes", label: "Localizações", icon: MapPin, permission: "locations.view" },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3, permission: "reports.view" },
   { to: "/configuracoes", label: "Configurações", icon: Settings, permission: "settings.view" },
+  { to: "/logs", label: "Logs", icon: ScrollText, permission: "audit_logs.view" },
 ];
 
 function isActivePath(pathname: string, to: string) {

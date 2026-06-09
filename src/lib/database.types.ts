@@ -19,7 +19,8 @@ export type PermissionKey =
   | "cost_centers.view"
   | "locations.view"
   | "reports.view"
-  | "settings.view";
+  | "settings.view"
+  | "audit_logs.view";
 
 export interface Profile {
   id: string;
@@ -123,4 +124,17 @@ export interface StockMovement {
   person?: Person | null;
   cost_center?: CostCenter | null;
   location?: Location | null;
+}
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  table_name: string;
+  record_id: string | null;
+  description: string;
+  metadata: Record<string, unknown>;
+  old_data: Record<string, unknown> | null;
+  new_data: Record<string, unknown> | null;
+  user_id: string | null;
+  created_at: string;
 }

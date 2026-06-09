@@ -17,6 +17,7 @@ import { Route as AuthenticatedQuotationsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedProdutosRouteImport } from './routes/_authenticated/produtos'
 import { Route as AuthenticatedPessoasRouteImport } from './routes/_authenticated/pessoas'
 import { Route as AuthenticatedMovimentacoesRouteImport } from './routes/_authenticated/movimentacoes'
+import { Route as AuthenticatedLogsRouteImport } from './routes/_authenticated/logs'
 import { Route as AuthenticatedLocalizacoesRouteImport } from './routes/_authenticated/localizacoes'
 import { Route as AuthenticatedFornecedoresRouteImport } from './routes/_authenticated/fornecedores'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
@@ -63,6 +64,11 @@ const AuthenticatedMovimentacoesRoute =
     path: '/movimentacoes',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedLogsRoute = AuthenticatedLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedLocalizacoesRoute =
   AuthenticatedLocalizacoesRouteImport.update({
     id: '/localizacoes',
@@ -100,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/localizacoes': typeof AuthenticatedLocalizacoesRoute
+  '/logs': typeof AuthenticatedLogsRoute
   '/movimentacoes': typeof AuthenticatedMovimentacoesRoute
   '/pessoas': typeof AuthenticatedPessoasRoute
   '/produtos': typeof AuthenticatedProdutosRoute
@@ -113,6 +120,7 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/localizacoes': typeof AuthenticatedLocalizacoesRoute
+  '/logs': typeof AuthenticatedLogsRoute
   '/movimentacoes': typeof AuthenticatedMovimentacoesRoute
   '/pessoas': typeof AuthenticatedPessoasRoute
   '/produtos': typeof AuthenticatedProdutosRoute
@@ -129,6 +137,7 @@ export interface FileRoutesById {
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/_authenticated/localizacoes': typeof AuthenticatedLocalizacoesRoute
+  '/_authenticated/logs': typeof AuthenticatedLogsRoute
   '/_authenticated/movimentacoes': typeof AuthenticatedMovimentacoesRoute
   '/_authenticated/pessoas': typeof AuthenticatedPessoasRoute
   '/_authenticated/produtos': typeof AuthenticatedProdutosRoute
@@ -146,6 +155,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/fornecedores'
     | '/localizacoes'
+    | '/logs'
     | '/movimentacoes'
     | '/pessoas'
     | '/produtos'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/fornecedores'
     | '/localizacoes'
+    | '/logs'
     | '/movimentacoes'
     | '/pessoas'
     | '/produtos'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/_authenticated/configuracoes'
     | '/_authenticated/fornecedores'
     | '/_authenticated/localizacoes'
+    | '/_authenticated/logs'
     | '/_authenticated/movimentacoes'
     | '/_authenticated/pessoas'
     | '/_authenticated/produtos'
@@ -246,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMovimentacoesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/logs': {
+      id: '/_authenticated/logs'
+      path: '/logs'
+      fullPath: '/logs'
+      preLoaderRoute: typeof AuthenticatedLogsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/localizacoes': {
       id: '/_authenticated/localizacoes'
       path: '/localizacoes'
@@ -290,6 +309,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedFornecedoresRoute: typeof AuthenticatedFornecedoresRoute
   AuthenticatedLocalizacoesRoute: typeof AuthenticatedLocalizacoesRoute
+  AuthenticatedLogsRoute: typeof AuthenticatedLogsRoute
   AuthenticatedMovimentacoesRoute: typeof AuthenticatedMovimentacoesRoute
   AuthenticatedPessoasRoute: typeof AuthenticatedPessoasRoute
   AuthenticatedProdutosRoute: typeof AuthenticatedProdutosRoute
@@ -304,6 +324,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedFornecedoresRoute: AuthenticatedFornecedoresRoute,
   AuthenticatedLocalizacoesRoute: AuthenticatedLocalizacoesRoute,
+  AuthenticatedLogsRoute: AuthenticatedLogsRoute,
   AuthenticatedMovimentacoesRoute: AuthenticatedMovimentacoesRoute,
   AuthenticatedPessoasRoute: AuthenticatedPessoasRoute,
   AuthenticatedProdutosRoute: AuthenticatedProdutosRoute,

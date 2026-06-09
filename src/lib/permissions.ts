@@ -22,6 +22,7 @@ export const PERMISSIONS: PermissionDefinition[] = [
   { key: "locations.view", label: "Localizações", group: "Telas" },
   { key: "reports.view", label: "Relatórios", group: "Telas" },
   { key: "settings.view", label: "Configurações", group: "Telas" },
+  { key: "audit_logs.view", label: "Visualizar logs", group: "Sistema" },
   { key: "movements.create_in", label: "Registrar entradas", group: "Movimentações" },
   { key: "movements.create_out", label: "Registrar saídas", group: "Movimentações" },
   { key: "quotations.create", label: "Criar cotações", group: "Cotações" },
@@ -110,6 +111,11 @@ export const ROUTE_PERMISSIONS = [
     path: "/configuracoes",
     match: (pathname: string) => pathname.startsWith("/configuracoes"),
     permissions: "settings.view",
+  },
+  {
+    path: "/logs",
+    match: (pathname: string) => pathname.startsWith("/logs"),
+    permissions: "audit_logs.view",
   },
 ] as const satisfies ReadonlyArray<{
   path: string;
