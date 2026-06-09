@@ -51,12 +51,17 @@ export function DataTable<T extends { id: string }>({
     if (query && searchKeys?.length) {
       const q = query.toLowerCase();
       rows = rows.filter((r) =>
-        searchKeys.some((k) => String(r[k] ?? "").toLowerCase().includes(q)),
+        searchKeys.some((k) =>
+          String(r[k] ?? "")
+            .toLowerCase()
+            .includes(q),
+        ),
       );
     }
     if (sortKey) {
       const col = columns.find((c) => c.key === sortKey);
-      const fn = col?.sortValue ?? ((r: T) => String((r as Record<string, unknown>)[sortKey] ?? ""));
+      const fn =
+        col?.sortValue ?? ((r: T) => String((r as Record<string, unknown>)[sortKey] ?? ""));
       rows = [...rows].sort((a, b) => {
         const av = fn(a);
         const bv = fn(b);
@@ -90,12 +95,12 @@ export function DataTable<T extends { id: string }>({
             setQuery(e.target.value);
             setPage(1);
           }}
-          className="max-w-xs bg-card"
+          className="w-full bg-card sm:max-w-xs"
         />
       )}
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 {columns.map((c) => (
@@ -107,7 +112,11 @@ export function DataTable<T extends { id: string }>({
                     <span className="inline-flex items-center gap-1">
                       {c.header}
                       {sortKey === c.key &&
-                        (sortDir === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
+                        (sortDir === "asc" ? (
+                          <ChevronUp className="size-3" />
+                        ) : (
+                          <ChevronDown className="size-3" />
+                        ))}
                     </span>
                   </th>
                 ))}
@@ -117,7 +126,10 @@ export function DataTable<T extends { id: string }>({
             <tbody>
               {paged.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 1} className="text-center py-12 text-muted-foreground">
+                  <td
+                    colSpan={columns.length + 1}
+                    className="text-center py-12 text-muted-foreground"
+                  >
                     {emptyText}
                   </td>
                 </tr>
@@ -126,7 +138,9 @@ export function DataTable<T extends { id: string }>({
                   <tr key={row.id} className="border-t border-border hover:bg-muted/30">
                     {columns.map((c) => (
                       <td key={c.key} className={`px-4 py-3 ${c.className ?? ""}`}>
-                        {c.render ? c.render(row) : String((row as Record<string, unknown>)[c.key] ?? "—")}
+                        {c.render
+                          ? c.render(row)
+                          : String((row as Record<string, unknown>)[c.key] ?? "—")}
                       </td>
                     ))}
                     {(onEdit || onDelete) && (
@@ -153,7 +167,9 @@ export function DataTable<T extends { id: string }>({
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => onDelete(row)}>Excluir</AlertDialogAction>
+                                  <AlertDialogAction onClick={() => onDelete(row)}>
+                                    Excluir
+                                  </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
@@ -168,15 +184,25 @@ export function DataTable<T extends { id: string }>({
           </table>
         </div>
       </div>
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>
           {filtered.length} registros · página {current} de {totalPages}
         </span>
-        <div className="flex gap-1">
-          <Button size="sm" variant="outline" disabled={current === 1} onClick={() => setPage((p) => p - 1)}>
+        <div className="grid grid-cols-2 gap-1 sm:flex">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={current === 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
             Anterior
           </Button>
-          <Button size="sm" variant="outline" disabled={current === totalPages} onClick={() => setPage((p) => p + 1)}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={current === totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
             Próxima
           </Button>
         </div>
