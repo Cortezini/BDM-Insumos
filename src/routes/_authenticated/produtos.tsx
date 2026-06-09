@@ -13,7 +13,10 @@ import type { Product, Supplier, ProductCategory, Location as Loc } from "@/lib/
 export const Route = createFileRoute("/_authenticated/produtos")({ component: Page });
 
 function Page() {
-  const list = useList<Product>("products", "*, category:product_categories(*), supplier:suppliers(*), location:locations(*)");
+  const list = useList<Product>(
+    "products",
+    "*, category:product_categories(*), supplier:suppliers(*), location:locations(*)",
+  );
   const cats = useList<ProductCategory>("product_categories", "*", "name");
   const sups = useList<Supplier>("suppliers", "*", "name");
   const locs = useList<Loc>("locations", "*", "name");
@@ -66,7 +69,9 @@ function Page() {
         description="Catálogo de itens e saldos atuais."
         actions={
           <>
-            <Button variant="outline" onClick={() => setCatOpen(true)}>Nova categoria</Button>
+            <Button variant="outline" onClick={() => setCatOpen(true)}>
+              Nova categoria
+            </Button>
             <Button
               variant="outline"
               onClick={() =>
@@ -87,7 +92,12 @@ function Page() {
             >
               <Download className="size-4 mr-2" /> Exportar
             </Button>
-            <Button onClick={() => { setEditing(null); setOpen(true); }}>
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setOpen(true);
+              }}
+            >
               <Plus className="size-4 mr-2" /> Novo produto
             </Button>
           </>
@@ -98,37 +108,58 @@ function Page() {
         searchKeys={["name", "sku"]}
         columns={[
           { key: "sku", header: "SKU", className: "font-mono text-xs" },
-          { key: "name", header: "Produto", render: (r) => (
-            <div>
-              <div className="font-medium">{r.name}</div>
-              <div className="text-xs text-muted-foreground">{r.category?.name ?? "Sem categoria"}</div>
-            </div>
-          ) },
+          {
+            key: "name",
+            header: "Produto",
+            render: (r) => (
+              <div>
+                <div className="font-medium">{r.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {r.category?.name ?? "Sem categoria"}
+                </div>
+              </div>
+            ),
+          },
           { key: "unit", header: "Unid." },
           {
             key: "current_stock",
             header: "Estoque",
             sortValue: (r) => Number(r.current_stock),
             render: (r) => {
-              const low = Number(r.current_stock) <= Number(r.min_stock);
+              const low = Number(r.min_stock) > 0 && Number(r.current_stock) <= Number(r.min_stock);
               return (
                 <div className="flex items-center gap-2">
                   <span className="tabular-nums">{number(Number(r.current_stock))}</span>
-                  {low && <Badge className="bg-[color:var(--warning)]/15 text-[color:var(--warning)] hover:bg-[color:var(--warning)]/20">Baixo</Badge>}
+                  {low && (
+                    <Badge className="bg-[color:var(--warning)]/15 text-[color:var(--warning)] hover:bg-[color:var(--warning)]/20">
+                      Baixo
+                    </Badge>
+                  )}
                 </div>
               );
             },
           },
           { key: "avg_cost", header: "Custo médio", render: (r) => currency(Number(r.avg_cost)) },
-          { key: "reference_price", header: "Preço ref.", render: (r) => currency(Number(r.reference_price)) },
+          {
+            key: "reference_price",
+            header: "Preço ref.",
+            render: (r) => currency(Number(r.reference_price)),
+          },
           { key: "supplier", header: "Fornecedor", render: (r) => r.supplier?.name ?? "—" },
           {
             key: "active",
             header: "Status",
-            render: (r) => <Badge variant={r.active ? "default" : "secondary"}>{r.active ? "Ativo" : "Inativo"}</Badge>,
+            render: (r) => (
+              <Badge variant={r.active ? "default" : "secondary"}>
+                {r.active ? "Ativo" : "Inativo"}
+              </Badge>
+            ),
           },
         ]}
-        onEdit={(r) => { setEditing(r); setOpen(true); }}
+        onEdit={(r) => {
+          setEditing(r);
+          setOpen(true);
+        }}
         onDelete={(r) => del.mutate(r.id)}
       />
 
@@ -137,9 +168,17 @@ function Page() {
         onOpenChange={setOpen}
         title={editing ? "Editar produto" : "Novo produto"}
         fields={fields}
-        initial={(editing ?? { active: true, unit: "UN", min_stock: 0, reference_price: 0 }) as Record<string, unknown>}
+        initial={
+          (editing ?? { active: true, unit: "UN", min_stock: 0, reference_price: 0 }) as Record<
+            string,
+            unknown
+          >
+        }
         submitting={upsert.isPending}
-        onSubmit={async (v) => { await upsert.mutateAsync(v); setOpen(false); }}
+        onSubmit={async (v) => {
+          await upsert.mutateAsync(v);
+          setOpen(false);
+        }}
       />
       <RecordModal
         open={catOpen}
@@ -147,7 +186,10 @@ function Page() {
         title="Nova categoria"
         fields={[{ name: "name", label: "Nome", type: "text", required: true }]}
         submitting={upsertCat.isPending}
-        onSubmit={async (v) => { await upsertCat.mutateAsync(v); setCatOpen(false); }}
+        onSubmit={async (v) => {
+          await upsertCat.mutateAsync(v);
+          setCatOpen(false);
+        }}
       />
     </div>
   );

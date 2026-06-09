@@ -128,9 +128,7 @@ function QuotationsPage() {
   const supplierComparison = useMemo(() => {
     if (analysisProductId === "all" || !enrichedQuotes.length) return null;
 
-    const productQuotes = enrichedQuotes.filter(
-      (q) => q.product_id === analysisProductId && q.status === "approved",
-    );
+    const productQuotes = enrichedQuotes.filter((q) => q.product_id === analysisProductId);
     if (productQuotes.length === 0) return [];
 
     const stats: Record<string, SupplierStats> = {};
@@ -332,11 +330,11 @@ function QuotationsPage() {
 
         {analysisProductId === "all" ? (
           <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-md border border-dashed">
-            Selecione um produto acima para ver o ranking de fornecedores e médias aprovadas.
+            Selecione um produto acima para ver o ranking de fornecedores e médias.
           </div>
         ) : supplierComparison?.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-md border border-dashed">
-            Nenhuma cotação aprovada para este produto ainda.
+            Nenhuma cotação para este produto ainda.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

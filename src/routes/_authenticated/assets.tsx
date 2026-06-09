@@ -42,6 +42,9 @@ export const Route = createFileRoute("/_authenticated/assets")({
   component: TIAssetsPage,
 });
 
+const OPERATIONAL_STATUS_OPTIONS = ["Em Uso", "Manutenção", "Backup", "Descartado"] as const;
+const DEFAULT_OPERATIONAL_STATUS = OPERATIONAL_STATUS_OPTIONS[0];
+
 const initialForm = {
   id: undefined as string | undefined,
   name: "",
@@ -50,7 +53,7 @@ const initialForm = {
   responsible_person_id: "",
   serial_number: "",
   patrimony_tag: "",
-  status: "Disponível",
+  status: DEFAULT_OPERATIONAL_STATUS,
   ip_address: "",
   mac_address: "",
   notes: "",
@@ -142,18 +145,23 @@ function TIAssetsPage() {
     }) satisfies EnrichedAssetRecord[];
   }, [assets, assetTypes, locations, people]);
 
-  // Aplicação do filtro por Status selecionado nos Cards
-  const filteredAssets = useMemo(() => {
+  const assetsMatchingAdvancedFilters = useMemo(() => {
     return enrichedAssets.filter((a) => {
-      const matchesStatus = filterStatus === "todos" || a.status === filterStatus;
       const matchesAssetType = filterAssetType === "todos" || a.asset_type_id === filterAssetType;
       const matchesLocation = filterLocation === "todos" || a.location_id === filterLocation;
       const matchesResponsible =
         filterResponsible === "todos" || a.responsible_person_id === filterResponsible;
 
-      return matchesStatus && matchesAssetType && matchesLocation && matchesResponsible;
+      return matchesAssetType && matchesLocation && matchesResponsible;
     });
-  }, [enrichedAssets, filterStatus, filterAssetType, filterLocation, filterResponsible]);
+  }, [enrichedAssets, filterAssetType, filterLocation, filterResponsible]);
+
+  // Aplicação do filtro por Status selecionado nos Cards
+  const filteredAssets = useMemo(() => {
+    return assetsMatchingAdvancedFilters.filter((a) => {
+      return filterStatus === "todos" || a.status === filterStatus;
+    });
+  }, [assetsMatchingAdvancedFilters, filterStatus]);
 
   // Cálculo da Paginação: Fatiamento matemático do array principal
   const paginatedAssets = useMemo(() => {
@@ -169,15 +177,14 @@ function TIAssetsPage() {
 
   // Agregadores para os cards contadores do topo da tela
   const counters = useMemo(() => {
-    if (!assets) return { total: 0, emUso: 0, manutencao: 0, backup: 0 };
-    const arr = assets;
+    const arr = assetsMatchingAdvancedFilters;
     return {
       total: arr.length,
       emUso: arr.filter((a) => a.status === "Em Uso").length,
       manutencao: arr.filter((a) => a.status === "Manutenção").length,
       backup: arr.filter((a) => a.status === "Backup").length,
     };
-  }, [assets]);
+  }, [assetsMatchingAdvancedFilters]);
 
   // Função disparada ao clicar no Lápis (Prepara a UI para edição)
   const handleEdit = (asset: EnrichedAssetRecord) => {
@@ -189,7 +196,11 @@ function TIAssetsPage() {
       responsible_person_id: asset.responsible_person_id || "",
       serial_number: asset.serial_number || "",
       patrimony_tag: asset.patrimony_tag || "",
-      status: asset.status || "Disponível",
+      status: OPERATIONAL_STATUS_OPTIONS.includes(
+        asset.status as (typeof OPERATIONAL_STATUS_OPTIONS)[number],
+      )
+        ? asset.status || DEFAULT_OPERATIONAL_STATUS
+        : DEFAULT_OPERATIONAL_STATUS,
       ip_address: asset.ip_address || "",
       mac_address: asset.mac_address || "",
       notes: asset.notes || "",
@@ -369,11 +380,11 @@ function TIAssetsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Disponível">Disponível</SelectItem>
-                    <SelectItem value="Em Uso">Em Uso</SelectItem>
-                    <SelectItem value="Manutenção">Manutenção</SelectItem>
-                    <SelectItem value="Backup">Backup</SelectItem>
-                    <SelectItem value="Descartado">Descartado</SelectItem>
+                    {OPERATIONAL_STATUS_OPTIONS.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

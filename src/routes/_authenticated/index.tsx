@@ -1,13 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Package,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  Truck,
-  AlertTriangle,
-} from "lucide-react";
+import { Package, TrendingUp, TrendingDown, Wallet, Truck, AlertTriangle } from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -41,17 +34,35 @@ function DashboardPage() {
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
       const [products, movsIn, movsOut, suppliers, low] = await Promise.all([
         db.from("products").select("current_stock, avg_cost, min_stock, active"),
-        db.from("stock_movements").select("quantity").eq("type", "in").gte("movement_date", monthStart),
-        db.from("stock_movements").select("quantity").eq("type", "out").gte("movement_date", monthStart),
+        db
+          .from("stock_movements")
+          .select("quantity")
+          .eq("type", "in")
+          .gte("movement_date", monthStart),
+        db
+          .from("stock_movements")
+          .select("quantity")
+          .eq("type", "out")
+          .gte("movement_date", monthStart),
         db.from("suppliers").select("id", { count: "exact", head: true }).eq("active", true),
         db.from("products").select("id, current_stock, min_stock").eq("active", true),
       ]);
-      const prods = (products.data ?? []) as { current_stock: number; avg_cost: number; min_stock: number }[];
-      const inSum = ((movsIn.data ?? []) as { quantity: number }[]).reduce((s, m) => s + Number(m.quantity), 0);
-      const outSum = ((movsOut.data ?? []) as { quantity: number }[]).reduce((s, m) => s + Number(m.quantity), 0);
+      const prods = (products.data ?? []) as {
+        current_stock: number;
+        avg_cost: number;
+        min_stock: number;
+      }[];
+      const inSum = ((movsIn.data ?? []) as { quantity: number }[]).reduce(
+        (s, m) => s + Number(m.quantity),
+        0,
+      );
+      const outSum = ((movsOut.data ?? []) as { quantity: number }[]).reduce(
+        (s, m) => s + Number(m.quantity),
+        0,
+      );
       const balance = prods.reduce((s, p) => s + Number(p.current_stock) * Number(p.avg_cost), 0);
       const lowCount = ((low.data ?? []) as { current_stock: number; min_stock: number }[]).filter(
-        (p) => Number(p.current_stock) <= Number(p.min_stock),
+        (p) => Number(p.min_stock) > 0 && Number(p.current_stock) <= Number(p.min_stock),
       ).length;
       return {
         totalProducts: prods.length,
@@ -78,14 +89,20 @@ function DashboardPage() {
         const d = new Date(from);
         d.setDate(d.getDate() + i);
         const key = d.toISOString().slice(0, 10);
-        days[key] = { day: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), entradas: 0, saidas: 0 };
+        days[key] = {
+          day: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+          entradas: 0,
+          saidas: 0,
+        };
       }
-      ((data ?? []) as { type: "in" | "out"; quantity: number; movement_date: string }[]).forEach((m) => {
-        const k = m.movement_date.slice(0, 10);
-        if (!days[k]) return;
-        if (m.type === "in") days[k].entradas += Number(m.quantity);
-        else days[k].saidas += Number(m.quantity);
-      });
+      ((data ?? []) as { type: "in" | "out"; quantity: number; movement_date: string }[]).forEach(
+        (m) => {
+          const k = m.movement_date.slice(0, 10);
+          if (!days[k]) return;
+          if (m.type === "in") days[k].entradas += Number(m.quantity);
+          else days[k].saidas += Number(m.quantity);
+        },
+      );
       return Object.values(days);
     },
   });
@@ -115,19 +132,57 @@ function DashboardPage() {
         .from("products")
         .select("id, name, sku, current_stock, min_stock")
         .eq("active", true);
-      return ((data ?? []) as { id: string; name: string; sku: string; current_stock: number; min_stock: number }[])
-        .filter((p) => Number(p.current_stock) <= Number(p.min_stock))
+      return (
+        (data ?? []) as {
+          id: string;
+          name: string;
+          sku: string;
+          current_stock: number;
+          min_stock: number;
+        }[]
+      )
+        .filter((p) => Number(p.min_stock) > 0 && Number(p.current_stock) <= Number(p.min_stock))
         .slice(0, 6);
     },
   });
 
   const cards = [
-    { label: "Total de produtos", value: number(stats?.totalProducts ?? 0), icon: Package, color: "text-primary" },
-    { label: "Entradas no mês", value: number(stats?.inMonth ?? 0), icon: TrendingUp, color: "text-[color:var(--success)]" },
-    { label: "Saídas no mês", value: number(stats?.outMonth ?? 0), icon: TrendingDown, color: "text-destructive" },
-    { label: "Saldo em estoque", value: currency(stats?.balance ?? 0), icon: Wallet, color: "text-primary" },
-    { label: "Fornecedores ativos", value: number(stats?.suppliers ?? 0), icon: Truck, color: "text-foreground" },
-    { label: "Alertas de estoque", value: number(stats?.lowStock ?? 0), icon: AlertTriangle, color: "text-[color:var(--warning)]" },
+    {
+      label: "Total de produtos",
+      value: number(stats?.totalProducts ?? 0),
+      icon: Package,
+      color: "text-primary",
+    },
+    {
+      label: "Entradas no mês",
+      value: number(stats?.inMonth ?? 0),
+      icon: TrendingUp,
+      color: "text-[color:var(--success)]",
+    },
+    {
+      label: "Saídas no mês",
+      value: number(stats?.outMonth ?? 0),
+      icon: TrendingDown,
+      color: "text-destructive",
+    },
+    {
+      label: "Saldo em estoque",
+      value: currency(stats?.balance ?? 0),
+      icon: Wallet,
+      color: "text-primary",
+    },
+    {
+      label: "Fornecedores ativos",
+      value: number(stats?.suppliers ?? 0),
+      icon: Truck,
+      color: "text-foreground",
+    },
+    {
+      label: "Alertas de estoque",
+      value: number(stats?.lowStock ?? 0),
+      icon: AlertTriangle,
+      color: "text-[color:var(--warning)]",
+    },
   ];
 
   return (
@@ -140,7 +195,9 @@ function DashboardPage() {
           return (
             <div key={c.label} className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground">{c.label}</div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                  {c.label}
+                </div>
                 <Icon className={`size-4 ${c.color}`} />
               </div>
               <div className="text-xl font-semibold tabular-nums">{c.value}</div>
@@ -170,12 +227,26 @@ function DashboardPage() {
                     <stop offset="100%" stopColor="oklch(0.60 0.22 25)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="oklch(0.91 0.012 255)" strokeDasharray="3 3" vertical={false} />
+                <CartesianGrid
+                  stroke="oklch(0.91 0.012 255)"
+                  strokeDasharray="3 3"
+                  vertical={false}
+                />
                 <XAxis dataKey="day" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
-                <Area dataKey="entradas" stroke="oklch(0.55 0.16 155)" fill="url(#g-in)" strokeWidth={2} />
-                <Area dataKey="saidas" stroke="oklch(0.55 0.22 25)" fill="url(#g-out)" strokeWidth={2} />
+                <Area
+                  dataKey="entradas"
+                  stroke="oklch(0.55 0.16 155)"
+                  fill="url(#g-in)"
+                  strokeWidth={2}
+                />
+                <Area
+                  dataKey="saidas"
+                  stroke="oklch(0.55 0.22 25)"
+                  fill="url(#g-out)"
+                  strokeWidth={2}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -253,7 +324,11 @@ function DashboardPage() {
                   { name: "Saídas", v: stats?.outMonth ?? 0 },
                 ]}
               >
-                <CartesianGrid stroke="oklch(0.91 0.012 255)" strokeDasharray="3 3" vertical={false} />
+                <CartesianGrid
+                  stroke="oklch(0.91 0.012 255)"
+                  strokeDasharray="3 3"
+                  vertical={false}
+                />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
