@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useList, useUpsert, useDelete } from "@/lib/crud";
 
+import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,8 +46,22 @@ export const Route = createFileRoute("/_authenticated/assets")({
 const OPERATIONAL_STATUS_OPTIONS = ["Em Uso", "Manutenção", "Backup", "Descartado"] as const;
 const DEFAULT_OPERATIONAL_STATUS = OPERATIONAL_STATUS_OPTIONS[0];
 
-const initialForm = {
-  id: undefined as string | undefined,
+type AssetFormData = {
+  id?: string;
+  name: string;
+  asset_type_id: string;
+  location_id: string;
+  responsible_person_id: string;
+  serial_number: string;
+  patrimony_tag: string;
+  status: (typeof OPERATIONAL_STATUS_OPTIONS)[number];
+  ip_address: string;
+  mac_address: string;
+  notes: string;
+};
+
+const initialForm: AssetFormData = {
+  id: undefined,
   name: "",
   asset_type_id: "",
   location_id: "",
@@ -114,6 +129,58 @@ function TIAssetsPage() {
 
   const upsertAsset = useUpsert("ti_assets");
   const deleteAsset = useDelete("ti_assets");
+
+  const assetTypeOptions = useMemo(
+    () =>
+      (assetTypes ?? []).map((type) => ({
+        value: type.id,
+        label: type.name || "Sem nome",
+      })),
+    [assetTypes],
+  );
+
+  const locationOptions = useMemo(
+    () =>
+      (locations ?? []).map((location) => ({
+        value: location.id,
+        label: location.name || "Sem nome",
+      })),
+    [locations],
+  );
+
+  const peopleOptions = useMemo(
+    () =>
+      (people ?? []).map((person) => ({
+        value: person.id,
+        label: person.full_name || "Sem nome",
+      })),
+    [people],
+  );
+
+  const assetTypeFilterOptions = useMemo(
+    () => [{ value: "todos", label: "Todas as categorias", pinned: true }, ...assetTypeOptions],
+    [assetTypeOptions],
+  );
+
+  const locationFilterOptions = useMemo(
+    () => [{ value: "todos", label: "Todas as localizações", pinned: true }, ...locationOptions],
+    [locationOptions],
+  );
+
+  const peopleFilterOptions = useMemo(
+    () => [{ value: "todos", label: "Todos os usuários", pinned: true }, ...peopleOptions],
+    [peopleOptions],
+  );
+
+  const locationFormOptions = useMemo(
+    () => [{ value: "", label: "Sem localização", pinned: true }, ...locationOptions],
+    [locationOptions],
+  );
+
+  const peopleFormOptions = useMemo(
+    () => [{ value: "", label: "Sem responsável", pinned: true }, ...peopleOptions],
+    [peopleOptions],
+  );
 
   // Efeito reativo para resetar a paginação ao mudar o filtro dos cards
   useEffect(() => {
@@ -197,9 +264,9 @@ function TIAssetsPage() {
       serial_number: asset.serial_number || "",
       patrimony_tag: asset.patrimony_tag || "",
       status: OPERATIONAL_STATUS_OPTIONS.includes(
-        asset.status as (typeof OPERATIONAL_STATUS_OPTIONS)[number],
+        asset.status as (typeof OPERATIONAL_STATUS_OPTIONS)[number]
       )
-        ? asset.status || DEFAULT_OPERATIONAL_STATUS
+        ? (asset.status as (typeof OPERATIONAL_STATUS_OPTIONS)[number])
         : DEFAULT_OPERATIONAL_STATUS,
       ip_address: asset.ip_address || "",
       mac_address: asset.mac_address || "",
@@ -211,7 +278,16 @@ function TIAssetsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await upsertAsset.mutateAsync(formData);
+      if (!formData.asset_type_id) {
+        toast.error("Selecione o tipo de ativo.");
+        return;
+      }
+
+      await upsertAsset.mutateAsync({
+        ...formData,
+        location_id: formData.location_id || null,
+        responsible_person_id: formData.responsible_person_id || null,
+      });
       toast.success(
         formData.id ? "Ativo atualizado com sucesso!" : "Ativo registrado com sucesso!",
       );
@@ -293,61 +369,42 @@ function TIAssetsPage() {
 
               <div className="space-y-2">
                 <Label>Tipo de Ativo</Label>
-                <Select
+                <SearchableSelect
                   value={formData.asset_type_id}
                   onValueChange={(v) => setFormData({ ...formData, asset_type_id: v })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {assetTypes?.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={assetTypeOptions}
+                  placeholder="Selecione o tipo..."
+                  searchPlaceholder="Digite o tipo..."
+                  emptyText="Nenhum tipo encontrado."
+                  disabled={loadingTypes}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Localização</Label>
-                  <Select
+                  <SearchableSelect
                     value={formData.location_id}
                     onValueChange={(v) => setFormData({ ...formData, location_id: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations?.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          {l.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={locationFormOptions}
+                    placeholder="Selecione..."
+                    searchPlaceholder="Digite a localização..."
+                    emptyText="Nenhuma localização encontrada."
+                    disabled={loadingLocations}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Responsável</Label>
-                  <Select
+                  <SearchableSelect
                     value={formData.responsible_person_id}
                     onValueChange={(v) => setFormData({ ...formData, responsible_person_id: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {people?.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={peopleFormOptions}
+                    placeholder="Selecione..."
+                    searchPlaceholder="Digite o usuário..."
+                    emptyText="Nenhum usuário encontrado."
+                    disabled={loadingPeople}
+                  />
                 </div>
               </div>
 
@@ -374,7 +431,7 @@ function TIAssetsPage() {
                 <Label className="text-primary font-semibold">Status Operacional</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(v) => setFormData({ ...formData, status: v })}
+                  onValueChange={(v) => setFormData({ ...formData, status: v as AssetFormData["status"] })}
                 >
                   <SelectTrigger className="border-primary/50">
                     <SelectValue />
@@ -487,65 +544,41 @@ function TIAssetsPage() {
           <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-3">
             <div className="space-y-2">
               <Label>Categoria</Label>
-              <Select
+              <SearchableSelect
                 value={filterAssetType}
                 onValueChange={setFilterAssetType}
+                options={assetTypeFilterOptions}
+                placeholder="Todas as categorias"
+                searchPlaceholder="Digite a categoria..."
+                emptyText="Nenhuma categoria encontrada."
                 disabled={loadingTypes}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas as categorias" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todas as categorias</SelectItem>
-                  {assetTypes?.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
 
             <div className="space-y-2">
               <Label>Localização</Label>
-              <Select
+              <SearchableSelect
                 value={filterLocation}
                 onValueChange={setFilterLocation}
+                options={locationFilterOptions}
+                placeholder="Todas as localizações"
+                searchPlaceholder="Digite a localização..."
+                emptyText="Nenhuma localização encontrada."
                 disabled={loadingLocations}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas as localizações" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todas as localizações</SelectItem>
-                  {locations?.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
 
             <div className="space-y-2">
               <Label>Usuário</Label>
-              <Select
+              <SearchableSelect
                 value={filterResponsible}
                 onValueChange={setFilterResponsible}
+                options={peopleFilterOptions}
+                placeholder="Todos os usuários"
+                searchPlaceholder="Digite o usuário..."
+                emptyText="Nenhum usuário encontrado."
                 disabled={loadingPeople}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos os usuários" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os usuários</SelectItem>
-                  {people?.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
           </div>
 

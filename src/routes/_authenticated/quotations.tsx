@@ -6,6 +6,7 @@ import { useList, useUpsert, useDelete } from "@/lib/crud";
 import { db } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 
+import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,13 +19,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -88,6 +82,29 @@ function QuotationsPage() {
 
   const upsertQuote = useUpsert("quotations");
   const deleteQuote = useDelete("quotations");
+
+  const productOptions = useMemo(
+    () =>
+      (products ?? []).map((product) => ({
+        value: product.id,
+        label: product.name || "Sem nome",
+      })),
+    [products],
+  );
+
+  const supplierOptions = useMemo(
+    () =>
+      (suppliers ?? []).map((supplier) => ({
+        value: supplier.id,
+        label: supplier.name || "Sem nome",
+      })),
+    [suppliers],
+  );
+
+  const analysisProductOptions = useMemo(
+    () => [{ value: "all", label: "Selecione um produto", pinned: true }, ...productOptions],
+    [productOptions],
+  );
 
   const reviewQuote = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
@@ -168,10 +185,26 @@ function QuotationsPage() {
         return;
       }
 
+      if (!formData.product_id) {
+        toast.error("Selecione o produto da cotação.");
+        return;
+      }
+
+      if (!formData.supplier_id) {
+        toast.error("Selecione o fornecedor da cotação.");
+        return;
+      }
+
+      const price = Number.parseFloat(formData.price);
+      if (!Number.isFinite(price) || price < 0) {
+        toast.error("Informe um preço válido para a cotação.");
+        return;
+      }
+
       await upsertQuote.mutateAsync({
         product_id: formData.product_id,
         supplier_id: formData.supplier_id,
-        price: parseFloat(formData.price),
+        price,
         purchase_link: formData.purchase_link.trim() || null,
         status: "pending",
       });
@@ -239,41 +272,27 @@ function QuotationsPage() {
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div className="space-y-2">
                 <Label>Produto</Label>
-                <Select
+                <SearchableSelect
                   value={formData.product_id}
                   onValueChange={(v) => setFormData({ ...formData, product_id: v })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products?.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={productOptions}
+                  placeholder="Selecione..."
+                  searchPlaceholder="Digite o produto..."
+                  emptyText="Nenhum produto encontrado."
+                  disabled={loadingProducts}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Fornecedor</Label>
-                <Select
+                <SearchableSelect
                   value={formData.supplier_id}
                   onValueChange={(v) => setFormData({ ...formData, supplier_id: v })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers?.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={supplierOptions}
+                  placeholder="Selecione..."
+                  searchPlaceholder="Digite o fornecedor..."
+                  emptyText="Nenhum fornecedor encontrado."
+                  disabled={loadingSuppliers}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Preço Ofertado (R$)</Label>
@@ -312,19 +331,15 @@ function QuotationsPage() {
             <h2 className="text-lg font-semibold">Comparativo por Produto</h2>
           </div>
           <div className="w-full md:w-72">
-            <Select value={analysisProductId} onValueChange={setAnalysisProductId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Escolha um produto para analisar" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">-- Selecione um produto --</SelectItem>
-                {products?.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={analysisProductId}
+              onValueChange={setAnalysisProductId}
+              options={analysisProductOptions}
+              placeholder="Escolha um produto para analisar"
+              searchPlaceholder="Digite o produto..."
+              emptyText="Nenhum produto encontrado."
+              disabled={loadingProducts}
+            />
           </div>
         </div>
 
