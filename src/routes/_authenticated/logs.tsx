@@ -1,17 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, ScrollText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -21,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { db } from "@/lib/supabase";
 import { dateTimeBR } from "@/lib/format";
 import type { AuditLog, Profile } from "@/lib/database.types";
@@ -50,6 +45,39 @@ const actionClasses: Record<string, string> = {
   user_permissions_updated: "bg-violet-500/10 text-violet-600 border-violet-500/20",
 };
 
+const tableLabels: Record<string, string> = {
+  asset_types: "Tipos de ativo",
+  audit_logs: "Logs",
+  cost_centers: "Centros de custo",
+  locations: "Localizações",
+  people: "Pessoas",
+  product_categories: "Categorias de produtos",
+  products: "Produtos",
+  profiles: "Usuários e permissões",
+  quotations: "Cotações",
+  stock_movements: "Movimentações",
+  suppliers: "Fornecedores",
+  ti_assets: "Ativos de TI",
+};
+
+function getTableLabel(tableName: string) {
+  return (
+    tableLabels[tableName] ??
+    tableName
+      .split("_")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ")
+  );
+}
+
+function normalizeSearchText(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 function stringifyDetails(value: unknown) {
   if (!value) return "{}";
   return JSON.stringify(value, null, 2);
@@ -59,6 +87,8 @@ function LogsPage() {
   const [query, setQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("todos");
   const [tableFilter, setTableFilter] = useState("todos");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 25;
 
   const logs = useQuery<AuditLog[]>({
     queryKey: ["audit_logs", "list"],
@@ -96,8 +126,30 @@ function LogsPage() {
     [logs.data],
   );
 
+  const actionOptions = useMemo(
+    () => [
+      { value: "todos", label: "Todas as ações", pinned: true },
+      ...actions.map((action) => ({
+        value: action,
+        label: actionLabels[action] ?? action,
+      })),
+    ],
+    [actions],
+  );
+
+  const tableOptions = useMemo(
+    () => [
+      { value: "todos", label: "Todas as telas", pinned: true },
+      ...tables.map((table) => ({
+        value: table,
+        label: getTableLabel(table),
+      })),
+    ],
+    [tables],
+  );
+
   const filteredLogs = useMemo(() => {
-    const search = query.trim().toLowerCase();
+    const search = normalizeSearchText(query.trim());
 
     return (logs.data ?? []).filter((log) => {
       const profile = log.user_id ? profileById.get(log.user_id) : null;
@@ -106,14 +158,24 @@ function LogsPage() {
       const matchesTable = tableFilter === "todos" || log.table_name === tableFilter;
       const matchesQuery =
         !search ||
-        log.description.toLowerCase().includes(search) ||
-        log.table_name.toLowerCase().includes(search) ||
-        log.action.toLowerCase().includes(search) ||
-        userLabel.toLowerCase().includes(search);
+        normalizeSearchText(log.description).includes(search) ||
+        normalizeSearchText(log.table_name).includes(search) ||
+        normalizeSearchText(getTableLabel(log.table_name)).includes(search) ||
+        normalizeSearchText(log.action).includes(search) ||
+        normalizeSearchText(actionLabels[log.action]).includes(search) ||
+        normalizeSearchText(userLabel).includes(search);
 
       return matchesAction && matchesTable && matchesQuery;
     });
   }, [actionFilter, logs.data, profileById, query, tableFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [actionFilter, query, tableFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedLogs = filteredLogs.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const isLoading = logs.isLoading || profiles.isLoading;
 
@@ -141,36 +203,24 @@ function LogsPage() {
 
           <div className="space-y-2">
             <Label>Ação</Label>
-            <Select value={actionFilter} onValueChange={setActionFilter}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todas</SelectItem>
-                {actions.map((action) => (
-                  <SelectItem key={action} value={action}>
-                    {actionLabels[action] ?? action}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={actionFilter}
+              onValueChange={setActionFilter}
+              options={actionOptions}
+              searchPlaceholder="Digite a ação..."
+              emptyText="Nenhuma ação encontrada."
+            />
           </div>
 
           <div className="space-y-2">
-            <Label>Tabela</Label>
-            <Select value={tableFilter} onValueChange={setTableFilter}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todas</SelectItem>
-                {tables.map((table) => (
-                  <SelectItem key={table} value={table}>
-                    {table}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Tela / tabela</Label>
+            <SearchableSelect
+              value={tableFilter}
+              onValueChange={setTableFilter}
+              options={tableOptions}
+              searchPlaceholder="Digite a tela..."
+              emptyText="Nenhuma tela encontrada."
+            />
           </div>
         </div>
       </div>
@@ -202,7 +252,7 @@ function LogsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredLogs.map((log) => {
+                paginatedLogs.map((log) => {
                   const profile = log.user_id ? profileById.get(log.user_id) : null;
                   const userLabel =
                     profile?.full_name ?? profile?.email ?? log.user_id?.slice(0, 8) ?? "Sistema";
@@ -231,7 +281,7 @@ function LogsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-sm">{userLabel}</TableCell>
-                      <TableCell className="font-mono text-xs">{log.table_name}</TableCell>
+                      <TableCell className="text-sm">{getTableLabel(log.table_name)}</TableCell>
                       <TableCell>
                         <details className="max-w-sm">
                           <summary className="inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-primary">
@@ -253,6 +303,29 @@ function LogsPage() {
               )}
             </TableBody>
           </Table>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <span>
+          {filteredLogs.length} registros · página {safePage} de {totalPages}
+        </span>
+        <div className="grid grid-cols-2 gap-1 sm:flex">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={safePage === 1}
+            onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+          >
+            Anterior
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={safePage === totalPages}
+            onClick={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+          >
+            Próxima
+          </Button>
         </div>
       </div>
     </div>

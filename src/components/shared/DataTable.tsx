@@ -19,6 +19,7 @@ export interface Column<T> {
   header: string;
   render?: (row: T) => ReactNode;
   sortValue?: (row: T) => string | number;
+  searchValue?: (row: T) => string | number | boolean | null | undefined;
   className?: string;
 }
 
@@ -30,6 +31,22 @@ interface Props<T extends { id: string }> {
   onDelete?: (row: T) => void | Promise<void>;
   emptyText?: string;
   pageSize?: number;
+}
+
+function normalizeSearch(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function isSearchableValue(value: unknown) {
+  return (
+    value == null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
 }
 
 export function DataTable<T extends { id: string }>({
@@ -48,15 +65,28 @@ export function DataTable<T extends { id: string }>({
 
   const filtered = useMemo(() => {
     let rows = data;
-    if (query && searchKeys?.length) {
-      const q = query.toLowerCase();
-      rows = rows.filter((r) =>
-        searchKeys.some((k) =>
-          String(r[k] ?? "")
-            .toLowerCase()
-            .includes(q),
-        ),
-      );
+    if (query.trim()) {
+      const q = normalizeSearch(query);
+      rows = rows.filter((row) => {
+        const values: unknown[] = [];
+        const record = row as Record<string, unknown>;
+
+        if (searchKeys?.length) {
+          searchKeys.forEach((key) => values.push(row[key]));
+        }
+
+        columns.forEach((column) => {
+          if (column.searchValue) {
+            values.push(column.searchValue(row));
+            return;
+          }
+
+          const value = record[column.key];
+          if (isSearchableValue(value)) values.push(value);
+        });
+
+        return values.some((value) => normalizeSearch(value).includes(q));
+      });
     }
     if (sortKey) {
       const col = columns.find((c) => c.key === sortKey);

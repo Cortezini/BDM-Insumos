@@ -269,7 +269,7 @@ function Page() {
 
       <DataTable
         data={rows}
-        searchKeys={["reason"]}
+        searchKeys={["reason", "notes"]}
         columns={[
           {
             key: "movement_date",
@@ -280,6 +280,7 @@ function Page() {
           {
             key: "type",
             header: "Tipo",
+            searchValue: (r) => (r.type === "in" ? "Entrada" : "Saída"),
             render: (r) => (
               <span
                 className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${
@@ -297,7 +298,12 @@ function Page() {
               </span>
             ),
           },
-          { key: "product", header: "Produto", render: (r) => r.product?.name ?? "—" },
+          {
+            key: "product",
+            header: "Produto",
+            searchValue: (r) => [r.product?.sku, r.product?.name, r.product?.unit].join(" "),
+            render: (r) => r.product?.name ?? "—",
+          },
           {
             key: "quantity",
             header: "Qtd",
@@ -312,6 +318,10 @@ function Page() {
           {
             key: "ref",
             header: "Origem / Destino",
+            searchValue: (r) =>
+              [r.supplier?.name, r.person?.full_name, r.cost_center?.name, r.location?.name].join(
+                " ",
+              ),
             render: (r) =>
               r.type === "in"
                 ? (r.supplier?.name ?? "—")

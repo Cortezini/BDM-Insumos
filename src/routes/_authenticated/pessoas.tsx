@@ -38,10 +38,20 @@ function Page() {
         description="Colaboradores e solicitantes."
         actions={
           <>
-            <Button variant="outline" onClick={() => exportToCSV("pessoas.csv", rows as unknown as Record<string, unknown>[])}>
+            <Button
+              variant="outline"
+              onClick={() =>
+                exportToCSV("pessoas.csv", rows as unknown as Record<string, unknown>[])
+              }
+            >
               <Download className="size-4 mr-2" /> Exportar
             </Button>
-            <Button onClick={() => { setEditing(null); setOpen(true); }}>
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setOpen(true);
+              }}
+            >
               <Plus className="size-4 mr-2" /> Nova pessoa
             </Button>
           </>
@@ -59,10 +69,18 @@ function Page() {
           {
             key: "active",
             header: "Status",
-            render: (r) => <Badge variant={r.active ? "default" : "secondary"}>{r.active ? "Ativo" : "Inativo"}</Badge>,
+            searchValue: (r) => (r.active ? "Ativo" : "Inativo"),
+            render: (r) => (
+              <Badge variant={r.active ? "default" : "secondary"}>
+                {r.active ? "Ativo" : "Inativo"}
+              </Badge>
+            ),
           },
         ]}
-        onEdit={(r) => { setEditing(r); setOpen(true); }}
+        onEdit={(r) => {
+          setEditing(r);
+          setOpen(true);
+        }}
         onDelete={(r) => del.mutate(r.id)}
       />
       <RecordModal
@@ -72,7 +90,10 @@ function Page() {
         fields={fields}
         initial={(editing ?? { active: true }) as Record<string, unknown>}
         submitting={upsert.isPending}
-        onSubmit={async (v) => { await upsert.mutateAsync(v); setOpen(false); }}
+        onSubmit={async (v) => {
+          await upsert.mutateAsync(v);
+          setOpen(false);
+        }}
       />
     </div>
   );

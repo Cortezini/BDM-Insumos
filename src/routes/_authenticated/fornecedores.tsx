@@ -151,6 +151,7 @@ function Page() {
           {
             key: "active",
             header: "Status",
+            searchValue: (r) => (r.active ? "Ativo" : "Inativo"),
             render: (r) => (
               <Badge variant={r.active ? "default" : "secondary"}>
                 {r.active ? "Ativo" : "Inativo"}

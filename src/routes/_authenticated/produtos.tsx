@@ -111,6 +111,7 @@ function Page() {
           {
             key: "name",
             header: "Produto",
+            searchValue: (r) => [r.name, r.category?.name].join(" "),
             render: (r) => (
               <div>
                 <div className="font-medium">{r.name}</div>
@@ -145,10 +146,16 @@ function Page() {
             header: "Preço ref.",
             render: (r) => currency(Number(r.reference_price)),
           },
-          { key: "supplier", header: "Fornecedor", render: (r) => r.supplier?.name ?? "—" },
+          {
+            key: "supplier",
+            header: "Fornecedor",
+            searchValue: (r) => r.supplier?.name,
+            render: (r) => r.supplier?.name ?? "—",
+          },
           {
             key: "active",
             header: "Status",
+            searchValue: (r) => (r.active ? "Ativo" : "Inativo"),
             render: (r) => (
               <Badge variant={r.active ? "default" : "secondary"}>
                 {r.active ? "Ativo" : "Inativo"}

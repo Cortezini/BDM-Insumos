@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Plus, ArrowRightLeft, ExternalLink, Check, X } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -75,6 +75,8 @@ function QuotationsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState(initialQuoteForm);
   const [analysisProductId, setAnalysisProductId] = useState<string>("all");
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyPageSize = 10;
 
   const { data: quotes, isLoading: loadingQuotes } = useList<QuoteRecord>("quotations");
   const { data: products, isLoading: loadingProducts } = useList<ProductRecord>("products");
@@ -246,6 +248,16 @@ function QuotationsPage() {
   };
 
   const isLoading = loadingQuotes || loadingProducts || loadingSuppliers;
+  const historyTotalPages = Math.max(1, Math.ceil(enrichedQuotes.length / historyPageSize));
+  const safeHistoryPage = Math.min(historyPage, historyTotalPages);
+  const paginatedQuotes = enrichedQuotes.slice(
+    (safeHistoryPage - 1) * historyPageSize,
+    safeHistoryPage * historyPageSize,
+  );
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [enrichedQuotes.length]);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -431,7 +443,7 @@ function QuotationsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              enrichedQuotes.map((quote) => {
+              paginatedQuotes.map((quote) => {
                 const purchaseLinkHref = getPurchaseLinkHref(quote.purchase_link);
 
                 return (
@@ -505,6 +517,29 @@ function QuotationsPage() {
             )}
           </TableBody>
         </Table>
+        <div className="flex flex-col gap-2 border-t bg-muted/20 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            {enrichedQuotes.length} registros · página {safeHistoryPage} de {historyTotalPages}
+          </span>
+          <div className="grid grid-cols-2 gap-1 sm:flex">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={safeHistoryPage === 1}
+              onClick={() => setHistoryPage((page) => Math.max(page - 1, 1))}
+            >
+              Anterior
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={safeHistoryPage === historyTotalPages}
+              onClick={() => setHistoryPage((page) => Math.min(page + 1, historyTotalPages))}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

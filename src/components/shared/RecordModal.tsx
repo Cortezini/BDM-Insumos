@@ -18,14 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { SearchableSelect } from "@/components/shared/SearchableSelect";
 
 export type RecordModalValues = Record<string, unknown>;
 export type RecordModalSetValues = Dispatch<SetStateAction<RecordModalValues>>;
@@ -137,22 +131,19 @@ export function RecordModal({
                     rows={3}
                   />
                 ) : f.type === "select" ? (
-                  <Select
+                  <SearchableSelect
                     value={(values[f.name] as string) ?? ""}
                     onValueChange={(v) => set(f.name, v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {f.allowEmpty && <SelectItem value="__none__">— Nenhum —</SelectItem>}
-                      {f.options.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={[
+                      ...(f.allowEmpty
+                        ? [{ value: "__none__", label: "— Nenhum —", pinned: true }]
+                        : []),
+                      ...f.options,
+                    ]}
+                    placeholder="Selecione..."
+                    searchPlaceholder={`Digite ${f.label.toLowerCase()}...`}
+                    emptyText="Nenhuma opção encontrada."
+                  />
                 ) : f.type === "switch" ? (
                   <div className="flex items-center gap-2 h-9">
                     <Switch checked={!!values[f.name]} onCheckedChange={(v) => set(f.name, v)} />

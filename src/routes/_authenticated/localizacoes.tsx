@@ -31,7 +31,12 @@ function Page() {
         title="Localizações"
         description="Armazéns, prateleiras e pontos de estoque."
         actions={
-          <Button onClick={() => { setEditing(null); setOpen(true); }}>
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setOpen(true);
+            }}
+          >
             <Plus className="size-4 mr-2" /> Nova localização
           </Button>
         }
@@ -46,10 +51,18 @@ function Page() {
           {
             key: "active",
             header: "Status",
-            render: (r) => <Badge variant={r.active ? "default" : "secondary"}>{r.active ? "Ativo" : "Inativo"}</Badge>,
+            searchValue: (r) => (r.active ? "Ativo" : "Inativo"),
+            render: (r) => (
+              <Badge variant={r.active ? "default" : "secondary"}>
+                {r.active ? "Ativo" : "Inativo"}
+              </Badge>
+            ),
           },
         ]}
-        onEdit={(r) => { setEditing(r); setOpen(true); }}
+        onEdit={(r) => {
+          setEditing(r);
+          setOpen(true);
+        }}
         onDelete={(r) => del.mutate(r.id)}
       />
       <RecordModal
@@ -59,7 +72,10 @@ function Page() {
         fields={fields}
         initial={(editing ?? { active: true }) as Record<string, unknown>}
         submitting={upsert.isPending}
-        onSubmit={async (v) => { await upsert.mutateAsync(v); setOpen(false); }}
+        onSubmit={async (v) => {
+          await upsert.mutateAsync(v);
+          setOpen(false);
+        }}
       />
     </div>
   );
