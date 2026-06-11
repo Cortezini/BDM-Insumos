@@ -49,6 +49,27 @@ function isSearchableValue(value: unknown) {
   );
 }
 
+function collectSearchValues(value: unknown, output: unknown[], depth = 0) {
+  if (depth > 3) return;
+  if (isSearchableValue(value)) {
+    output.push(value);
+    return;
+  }
+  if (value instanceof Date) {
+    output.push(value.toISOString());
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectSearchValues(item, output, depth + 1));
+    return;
+  }
+  if (typeof value === "object" && value) {
+    Object.values(value as Record<string, unknown>).forEach((item) =>
+      collectSearchValues(item, output, depth + 1),
+    );
+  }
+}
+
 export function DataTable<T extends { id: string }>({
   data,
   columns,
@@ -70,6 +91,8 @@ export function DataTable<T extends { id: string }>({
       rows = rows.filter((row) => {
         const values: unknown[] = [];
         const record = row as Record<string, unknown>;
+
+        collectSearchValues(row, values);
 
         if (searchKeys?.length) {
           searchKeys.forEach((key) => values.push(row[key]));

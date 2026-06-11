@@ -88,7 +88,7 @@ function LogsPage() {
   const [actionFilter, setActionFilter] = useState("todos");
   const [tableFilter, setTableFilter] = useState("todos");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 25;
+  const pageSize = 10;
 
   const logs = useQuery<AuditLog[]>({
     queryKey: ["audit_logs", "list"],
