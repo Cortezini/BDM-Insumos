@@ -7,6 +7,7 @@ import { db } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
+import { CurrencyInput } from "@/components/shared/CurrencyInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +22,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { parseCurrencyInput } from "@/lib/format";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/quotations")({
@@ -197,7 +199,7 @@ function QuotationsPage() {
         return;
       }
 
-      const price = Number.parseFloat(formData.price);
+      const price = parseCurrencyInput(formData.price);
       if (!Number.isFinite(price) || price < 0) {
         toast.error("Informe um preço válido para a cotação.");
         return;
@@ -308,12 +310,9 @@ function QuotationsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Preço Ofertado (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                <CurrencyInput
                   value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  onValueChange={(price) => setFormData({ ...formData, price })}
                   required
                 />
               </div>

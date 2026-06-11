@@ -54,7 +54,7 @@ function Page() {
         options: (locs.data ?? []).map((l) => ({ value: l.id, label: l.name })),
       },
       { name: "min_stock", label: "Estoque mínimo", type: "number", step: "0.001" },
-      { name: "reference_price", label: "Preço de referência (R$)", type: "number", step: "0.01" },
+      { name: "reference_price", label: "Preço de referência (R$)", type: "currency" },
       { name: "active", label: "Status", type: "switch" },
     ],
     [cats.data, sups.data, locs.data],

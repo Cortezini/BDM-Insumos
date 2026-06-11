@@ -20,6 +20,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
+import { CurrencyInput } from "@/components/shared/CurrencyInput";
+import { formatCurrencyInputValue, parseCurrencyInput } from "@/lib/format";
 
 export type RecordModalValues = Record<string, unknown>;
 export type RecordModalSetValues = Dispatch<SetStateAction<RecordModalValues>>;
@@ -40,6 +42,13 @@ export type Field =
       required?: boolean;
       step?: string;
       action?: FieldAction;
+    }
+  | {
+      name: string;
+      label: string;
+      type: "currency";
+      placeholder?: string;
+      required?: boolean;
     }
   | { name: string; label: string; type: "textarea"; required?: boolean }
   | { name: string; label: string; type: "switch" }
@@ -89,6 +98,7 @@ export function RecordModal({
       fieldsRef.current.forEach((f) => {
         const v = src[f.name];
         if (f.type === "switch") init[f.name] = v ?? true;
+        else if (f.type === "currency") init[f.name] = formatCurrencyInputValue(v);
         else init[f.name] = v ?? "";
       });
       if (src.id) init.id = src.id;
@@ -112,6 +122,7 @@ export function RecordModal({
             for (const f of fields) {
               let v = values[f.name];
               if (f.type === "number") v = v === "" || v == null ? 0 : Number(v);
+              if (f.type === "currency") v = v === "" || v == null ? 0 : parseCurrencyInput(v);
               if (f.type === "select" && (v === "" || v === "__none__")) v = null;
               payload[f.name] = v;
             }
@@ -151,6 +162,13 @@ export function RecordModal({
                       {values[f.name] ? "Ativo" : "Inativo"}
                     </span>
                   </div>
+                ) : f.type === "currency" ? (
+                  <CurrencyInput
+                    placeholder={f.placeholder}
+                    required={f.required}
+                    value={(values[f.name] as string) ?? ""}
+                    onValueChange={(v) => set(f.name, v)}
+                  />
                 ) : (
                   <div className={f.action ? "flex gap-2" : ""}>
                     <Input

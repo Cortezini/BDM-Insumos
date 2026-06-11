@@ -157,7 +157,7 @@ function Page() {
 
   const inFields: Field[] = [
     ...baseFields,
-    { name: "unit_cost", label: "Custo unitário (R$)", type: "number", step: "0.01" },
+    { name: "unit_cost", label: "Custo unitário (R$)", type: "currency" },
     {
       name: "supplier_id",
       label: "Fornecedor",

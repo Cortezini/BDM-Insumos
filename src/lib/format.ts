@@ -1,5 +1,43 @@
-export const currency = (n: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n || 0);
+const brlFormatter = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+export const currency = (n: number) => brlFormatter.format(n || 0);
+
+export function formatCurrencyInputFromDigits(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+  return brlFormatter.format(Number(digits) / 100);
+}
+
+export function formatCurrencyInputValue(value: unknown) {
+  if (value === "" || value === null || value === undefined) return "";
+  if (typeof value === "number") return brlFormatter.format(value);
+
+  const text = String(value).trim();
+  if (!text) return "";
+
+  const plainNumber = Number(text);
+  if (/^-?\d+(\.\d+)?$/.test(text) && Number.isFinite(plainNumber)) {
+    return brlFormatter.format(plainNumber);
+  }
+
+  return formatCurrencyInputFromDigits(text);
+}
+
+export function parseCurrencyInput(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const text = String(value ?? "").trim();
+  if (!text) return 0;
+
+  const plainNumber = Number(text);
+  if (/^-?\d+(\.\d+)?$/.test(text) && Number.isFinite(plainNumber)) {
+    return plainNumber;
+  }
+
+  const digits = text.replace(/\D/g, "");
+  return digits ? Number(digits) / 100 : 0;
+}
+
 export const number = (n: number) => new Intl.NumberFormat("pt-BR").format(n || 0);
 export const dateBR = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
 export const dateTimeBR = (iso: string) => new Date(iso).toLocaleString("pt-BR");
@@ -11,7 +49,10 @@ export function exportToCSV(filename: string, rows: Record<string, unknown>[]) {
     const s = v === null || v === undefined ? "" : String(v);
     return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const csv = [headers.join(";"), ...rows.map((r) => headers.map((h) => escape(r[h])).join(";"))].join("\n");
+  const csv = [
+    headers.join(";"),
+    ...rows.map((r) => headers.map((h) => escape(r[h])).join(";")),
+  ].join("\n");
   const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
