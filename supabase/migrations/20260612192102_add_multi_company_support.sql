@@ -146,7 +146,7 @@ as $$
   );
 $$;
 
-create or replace function private.is_admin(p_user_id uuid)
+create or replace function private.is_admin(user_id uuid)
 returns boolean
 language sql
 stable
@@ -157,7 +157,7 @@ as $$
     select 1
     from public.company_members cm
     join public.companies c on c.id = cm.company_id
-    where cm.user_id = p_user_id
+    where cm.user_id = is_admin.user_id
       and cm.role = 'admin'
       and cm.active
       and c.active
@@ -165,12 +165,12 @@ as $$
   or exists (
     select 1
     from public.profiles p
-    where p.id = p_user_id
+    where p.id = is_admin.user_id
       and p.role = 'admin'
   );
 $$;
 
-create or replace function private.has_permission(p_user_id uuid, p_permission_key text)
+create or replace function private.has_permission(user_id uuid, permission_key text)
 returns boolean
 language sql
 stable
@@ -181,21 +181,21 @@ as $$
     select 1
     from public.company_members cm
     join public.companies c on c.id = cm.company_id
-    where cm.user_id = p_user_id
+    where cm.user_id = has_permission.user_id
       and cm.active
       and c.active
       and (
         cm.role = 'admin'
-        or cm.permissions ? p_permission_key
+        or cm.permissions ? has_permission.permission_key
       )
   )
   or exists (
     select 1
     from public.profiles p
-    where p.id = p_user_id
+    where p.id = has_permission.user_id
       and (
         p.role = 'admin'
-        or p.permissions ? p_permission_key
+        or p.permissions ? has_permission.permission_key
       )
   );
 $$;
