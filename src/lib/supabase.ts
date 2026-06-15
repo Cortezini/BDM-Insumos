@@ -6,10 +6,9 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 if (!url || !anonKey) {
   // Helpful runtime hint when env vars are missing in production builds
-  // eslint-disable-next-line no-console
   console.warn(
     "[Supabase] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set. " +
-      "Configure them in .env.local (dev) or Netlify env (prod).",
+      "Configure them in .env.local (dev) or Cloudflare env (prod).",
   );
 }
 

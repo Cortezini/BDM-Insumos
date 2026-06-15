@@ -13,6 +13,7 @@ const COMPANY_ROLES = ["admin_empresa", "gestor", "almoxarife", "solicitante", "
 const GLOBAL_ROLES = ["super_admin", "suporte", "financeiro", "comercial"] as const;
 const FIRST_ACCESS_PATH = "/seguranca/primeiro-acesso";
 const MIN_PASSWORD_LENGTH = 10;
+const TEMP_PASSWORD_LENGTH = 24;
 
 const MODULES = [
   "dashboard",
@@ -87,6 +88,7 @@ type CallerProfile = {
   global_role: string | null;
   blocked: boolean;
   must_change_password: boolean;
+  must_enroll_mfa: boolean;
 };
 
 class HttpError extends Error {
@@ -219,6 +221,19 @@ function assertPasswordStrength(password: string, email: string, fullName: strin
   }
 }
 
+function isAal2(jwtClaims: Record<string, unknown> | undefined) {
+  return jwtClaims?.aal === "aal2";
+}
+
+function generateTemporaryPassword() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%*_-+=";
+  const random = new Uint8Array(TEMP_PASSWORD_LENGTH);
+  crypto.getRandomValues(random);
+
+  const password = Array.from(random, (byte) => chars[byte % chars.length]).join("");
+  return `${password}Aa1!`;
+}
+
 function positiveInteger(value: unknown, fallback: number) {
   const next = Number(value);
   if (!Number.isFinite(next) || next <= 0) return fallback;
@@ -259,7 +274,7 @@ function isGlobalRole(value: unknown): value is (typeof GLOBAL_ROLES)[number] {
 }
 
 function isSuperAdmin(profile: CallerProfile) {
-  if (profile.must_change_password) return false;
+  if (profile.must_change_password || profile.must_enroll_mfa) return false;
   return profile.global_role === "super_admin" || profile.role === "admin";
 }
 
@@ -272,7 +287,9 @@ function assertSuperAdmin(profile: CallerProfile) {
 async function getCaller(admin: SupabaseClient, callerId: string) {
   const { data, error } = await admin
     .from("profiles")
-    .select("id, email, full_name, role, permissions, global_role, blocked, must_change_password")
+    .select(
+      "id, email, full_name, role, permissions, global_role, blocked, must_change_password, must_enroll_mfa",
+    )
     .eq("id", callerId)
     .maybeSingle();
 
@@ -299,8 +316,8 @@ async function getCompany(admin: SupabaseClient, companyId: string) {
 }
 
 async function assertCompanyAdmin(admin: SupabaseClient, caller: CallerProfile, companyId: string) {
-  if (caller.must_change_password) {
-    throw new HttpError(403, "Troque sua senha antes de administrar usuarios.");
+  if (caller.must_change_password || caller.must_enroll_mfa) {
+    throw new HttpError(403, "Conclua as etapas de seguranca antes de administrar usuarios.");
   }
 
   if (isSuperAdmin(caller)) return;
@@ -437,7 +454,7 @@ async function createOrResolveUser(
   const existingProfile = await admin
     .from("profiles")
     .select(
-      "id, email, full_name, role, permissions, global_role, blocked, must_change_password, password_change_required_at, first_login_completed_at",
+      "id, email, full_name, role, permissions, global_role, blocked, must_change_password, password_change_required_at, first_login_completed_at, must_enroll_mfa, mfa_required_at",
     )
     .eq("email", email)
     .maybeSingle();
@@ -496,6 +513,8 @@ async function createOrResolveUser(
         blocked: false,
         must_change_password: true,
         password_change_required_at: now,
+        must_enroll_mfa: true,
+        mfa_required_at: now,
         invited_at: invited ? now : null,
       };
 
@@ -503,6 +522,9 @@ async function createOrResolveUser(
   if (existingProfile.data && existingProfile.data.must_change_password) {
     profilePayload.password_change_required_at =
       existingProfile.data.password_change_required_at ?? now;
+  }
+  if (existingProfile.data && existingProfile.data.must_enroll_mfa) {
+    profilePayload.mfa_required_at = existingProfile.data.mfa_required_at ?? now;
   }
 
   const profileRequest = existingProfile.data
@@ -819,6 +841,243 @@ async function updateGlobalRole(admin: SupabaseClient, caller: CallerProfile, pa
   return { profile };
 }
 
+async function getManagedCompanyUser(
+  admin: SupabaseClient,
+  caller: CallerProfile,
+  payload: JsonRecord,
+) {
+  const companyId = text(payload.companyId ?? payload.company_id);
+  const userId = text(payload.userId ?? payload.user_id);
+  if (!companyId || !userId) throw new HttpError(400, "Informe empresa e usuario.");
+
+  await assertCompanyAdmin(admin, caller, companyId);
+
+  const { data: membership, error: membershipError } = await admin
+    .from("company_members")
+    .select("*")
+    .eq("company_id", companyId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (membershipError) throw new HttpError(500, membershipError.message);
+  if (!membership) throw new HttpError(404, "Usuario nao pertence a esta empresa.");
+
+  const { data: targetProfile, error: profileError } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileError) throw new HttpError(500, profileError.message);
+  if (!targetProfile) throw new HttpError(404, "Perfil do usuario nao encontrado.");
+
+  const targetGlobalRole = targetProfile.global_role as string | null;
+  const targetCompanyRole = String(membership.role);
+  if (
+    !isSuperAdmin(caller) &&
+    (targetGlobalRole || targetCompanyRole === "admin" || targetCompanyRole === "admin_empresa")
+  ) {
+    throw new HttpError(403, "Admin da Empresa nao pode alterar senha de outro administrador.");
+  }
+
+  return {
+    companyId,
+    userId,
+    membership,
+    targetProfile: targetProfile as JsonRecord & {
+      id: string;
+      email: string;
+      full_name: string | null;
+    },
+  };
+}
+
+async function updateProfilePasswordFlags(
+  admin: SupabaseClient,
+  args: {
+    userId: string;
+    now: string;
+  },
+) {
+  const { data, error } = await admin
+    .from("profiles")
+    .update({
+      must_change_password: true,
+      password_change_required_at: args.now,
+      password_reset_requested_at: args.now,
+      updated_at: args.now,
+    })
+    .eq("id", args.userId)
+    .select("*")
+    .single();
+
+  if (error) throw new HttpError(500, error.message);
+  return data as JsonRecord;
+}
+
+async function setUserTemporaryPassword(
+  admin: SupabaseClient,
+  caller: CallerProfile,
+  payload: JsonRecord,
+) {
+  const { companyId, userId, targetProfile } = await getManagedCompanyUser(admin, caller, payload);
+  const password = text(payload.password ?? payload.newPassword ?? payload.new_password);
+  if (!password) throw new HttpError(400, "Informe a senha temporaria.");
+
+  assertPasswordStrength(password, targetProfile.email, targetProfile.full_name);
+
+  const { data: previous } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const authUpdate = await admin.auth.admin.updateUserById(userId, { password });
+  if (authUpdate.error) throw new HttpError(500, authUpdate.error.message);
+
+  const now = new Date().toISOString();
+  const profile = await updateProfilePasswordFlags(admin, { userId, now });
+
+  await writeAuditLog(admin, {
+    action: "user_temporary_password_set",
+    tableName: "profiles",
+    recordId: userId,
+    description: "Senha temporaria definida por administrador",
+    companyId,
+    callerId: caller.id,
+    metadata: { target_user_id: userId, target_email: targetProfile.email },
+    oldData: previous,
+    newData: profile,
+    targetUserId: userId,
+  });
+
+  return { profile };
+}
+
+async function clearUserPassword(
+  admin: SupabaseClient,
+  caller: CallerProfile,
+  payload: JsonRecord,
+) {
+  const { companyId, userId, targetProfile } = await getManagedCompanyUser(admin, caller, payload);
+  const resetPassword = generateTemporaryPassword();
+  const redirectTo = getFirstAccessRedirectTo(payload);
+
+  const { data: previous } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const authUpdate = await admin.auth.admin.updateUserById(userId, { password: resetPassword });
+  if (authUpdate.error) throw new HttpError(500, authUpdate.error.message);
+
+  const resetEmail = await getAnonClient().auth.resetPasswordForEmail(targetProfile.email, {
+    redirectTo,
+  });
+  if (resetEmail.error) throw new HttpError(500, resetEmail.error.message);
+
+  const now = new Date().toISOString();
+  const profile = await updateProfilePasswordFlags(admin, { userId, now });
+
+  await writeAuditLog(admin, {
+    action: "user_password_cleared",
+    tableName: "profiles",
+    recordId: userId,
+    description: "Senha limpa e link de redefinicao enviado",
+    companyId,
+    callerId: caller.id,
+    metadata: {
+      target_user_id: userId,
+      target_email: targetProfile.email,
+      reset_email_sent: true,
+    },
+    oldData: previous,
+    newData: profile,
+    targetUserId: userId,
+  });
+
+  return { profile };
+}
+
+async function completeMfaEnrollment(
+  admin: SupabaseClient,
+  caller: CallerProfile,
+  jwtClaims: Record<string, unknown> | undefined,
+) {
+  if (!isAal2(jwtClaims)) {
+    throw new HttpError(403, "Confirme o codigo do autenticador antes de concluir o 2FA.");
+  }
+
+  const { data: previous } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", caller.id)
+    .maybeSingle();
+
+  const now = new Date().toISOString();
+  const { data: profile, error } = await admin
+    .from("profiles")
+    .update({
+      must_enroll_mfa: false,
+      mfa_enrolled_at: previous?.mfa_enrolled_at ?? now,
+      mfa_last_verified_at: now,
+      updated_at: now,
+    })
+    .eq("id", caller.id)
+    .select("*")
+    .single();
+
+  if (error) throw new HttpError(500, error.message);
+
+  await writeAuditLog(admin, {
+    action: "user_mfa_enrolled",
+    tableName: "profiles",
+    recordId: caller.id,
+    description: "2FA cadastrado no primeiro acesso",
+    callerId: caller.id,
+    metadata: { target_user_id: caller.id, target_email: caller.email },
+    oldData: previous,
+    newData: profile,
+    targetUserId: caller.id,
+  });
+
+  return { profile };
+}
+
+async function recordMfaVerification(
+  admin: SupabaseClient,
+  caller: CallerProfile,
+  jwtClaims: Record<string, unknown> | undefined,
+) {
+  if (!isAal2(jwtClaims)) {
+    throw new HttpError(403, "Sessao 2FA invalida.");
+  }
+
+  const now = new Date().toISOString();
+  const { data: profile, error } = await admin
+    .from("profiles")
+    .update({ mfa_last_verified_at: now, updated_at: now })
+    .eq("id", caller.id)
+    .select("*")
+    .single();
+
+  if (error) throw new HttpError(500, error.message);
+
+  await writeAuditLog(admin, {
+    action: "user_mfa_verified",
+    tableName: "profiles",
+    recordId: caller.id,
+    description: "2FA confirmado no login",
+    callerId: caller.id,
+    metadata: { target_user_id: caller.id, target_email: caller.email },
+    newData: profile,
+    targetUserId: caller.id,
+  });
+
+  return { profile };
+}
+
 async function verifyCurrentPassword(caller: CallerProfile, currentPassword: string) {
   if (!currentPassword) return;
 
@@ -928,8 +1187,16 @@ const authenticatedHandler = withSupabase({ auth: "user" }, async (req, ctx) => 
         return response(200, await setUserBlocked(admin, caller, payload));
       case "update_global_role":
         return response(200, await updateGlobalRole(admin, caller, payload));
+      case "set_user_temporary_password":
+        return response(200, await setUserTemporaryPassword(admin, caller, payload));
+      case "clear_user_password":
+        return response(200, await clearUserPassword(admin, caller, payload));
       case "change_first_login_password":
         return response(200, await changeFirstLoginPassword(admin, caller, payload));
+      case "complete_mfa_enrollment":
+        return response(200, await completeMfaEnrollment(admin, caller, jwtClaims));
+      case "record_mfa_verification":
+        return response(200, await recordMfaVerification(admin, caller, jwtClaims));
       default:
         throw new HttpError(400, "Acao administrativa invalida.");
     }

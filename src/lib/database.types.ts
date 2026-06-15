@@ -48,6 +48,11 @@ export interface Profile {
   first_login_completed_at: string | null;
   invited_at: string | null;
   last_login_at: string | null;
+  must_enroll_mfa: boolean;
+  mfa_required_at: string | null;
+  mfa_enrolled_at: string | null;
+  mfa_last_verified_at: string | null;
+  password_reset_requested_at: string | null;
   created_at: string;
   updated_at?: string;
 }

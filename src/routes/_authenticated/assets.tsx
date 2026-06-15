@@ -264,7 +264,7 @@ function TIAssetsPage() {
       serial_number: asset.serial_number || "",
       patrimony_tag: asset.patrimony_tag || "",
       status: OPERATIONAL_STATUS_OPTIONS.includes(
-        asset.status as (typeof OPERATIONAL_STATUS_OPTIONS)[number]
+        asset.status as (typeof OPERATIONAL_STATUS_OPTIONS)[number],
       )
         ? (asset.status as (typeof OPERATIONAL_STATUS_OPTIONS)[number])
         : DEFAULT_OPERATIONAL_STATUS,
@@ -431,7 +431,9 @@ function TIAssetsPage() {
                 <Label className="text-primary font-semibold">Status Operacional</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(v) => setFormData({ ...formData, status: v as AssetFormData["status"] })}
+                  onValueChange={(v) =>
+                    setFormData({ ...formData, status: v as AssetFormData["status"] })
+                  }
                 >
                   <SelectTrigger className="border-primary/50">
                     <SelectValue />

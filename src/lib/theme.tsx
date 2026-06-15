@@ -6,8 +6,10 @@ const Ctx = createContext<{ theme: Theme; toggle: () => void } | null>(null);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>("light");
   useEffect(() => {
-    const saved = (typeof localStorage !== "undefined" && localStorage.getItem("theme")) as Theme | null;
-    const initial: Theme = saved ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const saved = (typeof localStorage !== "undefined" &&
+      localStorage.getItem("theme")) as Theme | null;
+    const initial: Theme =
+      saved ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     setTheme(initial);
   }, []);
   useEffect(() => {
@@ -15,7 +17,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("theme", theme);
   }, [theme]);
   return (
-    <Ctx.Provider value={{ theme, toggle: () => setTheme((t) => (t === "light" ? "dark" : "light")) }}>
+    <Ctx.Provider
+      value={{ theme, toggle: () => setTheme((t) => (t === "light" ? "dark" : "light")) }}
+    >
       {children}
     </Ctx.Provider>
   );

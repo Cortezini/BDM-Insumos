@@ -76,9 +76,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "BDM Insumos" },
-      { name: "description", content: "Sistema profissional de gestão de inventário com Supabase." },
+      {
+        name: "description",
+        content: "Sistema profissional de gestão de inventário com Supabase.",
+      },
       { property: "og:title", content: "BDM Insumos — Gestão executiva de estoque" },
-      { property: "og:description", content: "Controle de produtos, fornecedores, movimentações e relatórios." },
+      {
+        property: "og:description",
+        content: "Controle de produtos, fornecedores, movimentações e relatórios.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },

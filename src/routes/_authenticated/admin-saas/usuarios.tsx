@@ -246,6 +246,10 @@ function SaasUsersPage() {
               {row.active ? "Ativo na empresa" : "Inativo na empresa"}
             </Badge>
             {row.profile?.must_change_password && <Badge variant="outline">Primeiro acesso</Badge>}
+            {row.profile?.must_enroll_mfa && <Badge variant="outline">2FA pendente</Badge>}
+            {row.profile?.mfa_enrolled_at && !row.profile?.must_enroll_mfa && (
+              <Badge variant="secondary">2FA ativo</Badge>
+            )}
             {row.profile?.blocked && <Badge variant="destructive">Bloqueado</Badge>}
           </div>
         ),

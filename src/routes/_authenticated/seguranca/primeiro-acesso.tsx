@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { Profile } from "@/lib/database.types";
 import { validatePasswordPolicy } from "@/lib/password-policy";
 import { getDefaultRoute } from "@/lib/permissions";
+import { MFA_ROUTE } from "@/lib/security-routes";
 
 export const Route = createFileRoute("/_authenticated/seguranca/primeiro-acesso")({
   component: FirstAccessPage,
@@ -40,7 +41,10 @@ function FirstAccessPage() {
   const canSubmit = passwordPolicy.valid && passwordsMatch && !saving;
 
   const goToDefaultRoute = (nextProfile: Profile | null) => {
-    navigate({ to: getDefaultRoute(nextProfile) ?? "/", replace: true });
+    navigate({
+      to: nextProfile?.must_enroll_mfa ? MFA_ROUTE : (getDefaultRoute(nextProfile) ?? "/"),
+      replace: true,
+    });
   };
 
   const submit = async (event: React.FormEvent) => {

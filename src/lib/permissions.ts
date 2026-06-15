@@ -252,7 +252,7 @@ function isSaasPermission(permission: PermissionKey) {
 
 export function can(profile: Profile | null, permission: PermissionKey) {
   if (!profile) return false;
-  if (profile.must_change_password) return false;
+  if (profile.must_change_password || profile.must_enroll_mfa) return false;
   const role = normalizeCompanyRole(profile.role);
   if (role === "super_admin") return true;
   if (role === "admin_empresa") return !isSaasPermission(permission);

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Loader2, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, KeyRound, Loader2, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,11 @@ type UserForm = {
   role: CompanyRole;
 };
 
+type PasswordAction = {
+  row: CompanyUserRow;
+  mode: "temporary" | "clear";
+};
+
 function emptyForm(): UserForm {
   return {
     fullName: "",
@@ -64,6 +69,8 @@ function CompanyUsersPage() {
   const { activeCompany, profile, hasPermission } = useAuth();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<UserForm>(emptyForm);
+  const [passwordAction, setPasswordAction] = useState<PasswordAction | null>(null);
+  const [temporaryPassword, setTemporaryPassword] = useState("");
   const [expandedUsers, setExpandedUsers] = useState<string[]>([]);
   const canManage = hasPermission("company.users.manage");
   const canAssignCompanyAdmin = profile?.role === "super_admin";
@@ -156,6 +163,41 @@ function CompanyUsersPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const setTemporaryPasswordMutation = useMutation({
+    mutationFn: async () => {
+      if (!passwordAction || !temporaryPassword) throw new Error("Informe a senha temporaria.");
+      return invokeAdminAction("set_user_temporary_password", {
+        companyId: passwordAction.row.company_id,
+        userId: passwordAction.row.user_id,
+        password: temporaryPassword,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Senha temporaria definida");
+      setPasswordAction(null);
+      setTemporaryPassword("");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const clearPassword = useMutation({
+    mutationFn: async () => {
+      if (!passwordAction) throw new Error("Selecione um usuario.");
+      return invokeAdminAction("clear_user_password", {
+        companyId: passwordAction.row.company_id,
+        userId: passwordAction.row.user_id,
+        redirectTo: `${window.location.origin}/seguranca/primeiro-acesso`,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Senha limpa e link enviado");
+      setPasswordAction(null);
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const update = <K extends keyof UserForm>(key: K, value: UserForm[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
@@ -207,6 +249,8 @@ function CompanyUsersPage() {
           const permissionCount = isCompanyAdmin
             ? "Acesso total"
             : `${userRow.permissions?.length ?? 0} permissoes`;
+          const canManagePassword =
+            canManage && (profile?.role === "super_admin" || userRow.role !== "admin_empresa");
 
           return (
             <Collapsible
@@ -244,6 +288,12 @@ function CompanyUsersPage() {
                   {userRow.profile?.must_change_password && (
                     <Badge variant="outline">Primeiro acesso</Badge>
                   )}
+                  {userRow.profile?.must_enroll_mfa && (
+                    <Badge variant="outline">2FA pendente</Badge>
+                  )}
+                  {userRow.profile?.mfa_enrolled_at && !userRow.profile?.must_enroll_mfa && (
+                    <Badge variant="secondary">2FA ativo</Badge>
+                  )}
                   {userRow.profile?.blocked && <Badge variant="destructive">Bloqueado</Badge>}
                   <Badge variant="outline">{permissionCount}</Badge>
                   <SearchableSelect
@@ -269,6 +319,27 @@ function CompanyUsersPage() {
                     }
                   >
                     {userRow.active ? "Inativar" : "Ativar"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!canManagePassword}
+                    onClick={() => {
+                      setTemporaryPassword("");
+                      setPasswordAction({ row: userRow, mode: "temporary" });
+                    }}
+                  >
+                    <KeyRound className="mr-2 size-4" />
+                    Senha
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!canManagePassword}
+                    onClick={() => setPasswordAction({ row: userRow, mode: "clear" })}
+                  >
+                    <RotateCcw className="mr-2 size-4" />
+                    Limpar senha
                   </Button>
                 </div>
               </div>
@@ -369,6 +440,77 @@ function CompanyUsersPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!passwordAction}
+        onOpenChange={(nextOpen) => !nextOpen && setPasswordAction(null)}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {passwordAction?.mode === "temporary" ? "Alterar senha temporaria" : "Limpar senha"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {passwordAction?.mode === "temporary" ? (
+            <form
+              className="space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setTemporaryPasswordMutation.mutate();
+              }}
+            >
+              <div className="space-y-2">
+                <Label>Usuario</Label>
+                <div className="rounded-md border border-border px-3 py-2 text-sm">
+                  {passwordAction.row.profile?.full_name ?? passwordAction.row.profile?.email}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Nova senha temporaria</Label>
+                <Input
+                  type="password"
+                  value={temporaryPassword}
+                  onChange={(event) => setTemporaryPassword(event.target.value)}
+                  required
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setPasswordAction(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={setTemporaryPasswordMutation.isPending}>
+                  {setTemporaryPasswordMutation.isPending && (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  )}
+                  Salvar
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-md border border-border p-3 text-sm text-muted-foreground">
+                A senha atual sera invalidada e o usuario recebera um link por e-mail para criar uma
+                nova senha.
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setPasswordAction(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={clearPassword.isPending}
+                  onClick={() => clearPassword.mutate()}
+                >
+                  {clearPassword.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  Limpar senha
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

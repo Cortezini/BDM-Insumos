@@ -10,6 +10,7 @@ import type {
   UserRole,
 } from "./database.types";
 import { ALL_PERMISSIONS, can, getDefaultRoute, normalizeCompanyRole } from "./permissions";
+import { FIRST_ACCESS_ROUTE, MFA_ROUTE } from "./security-routes";
 
 interface AuthCtx {
   user: User | null;
@@ -18,6 +19,7 @@ interface AuthCtx {
   companies: Company[];
   activeCompany: Company | null;
   activeMembership: CompanyMembership | null;
+  needsMfa: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -29,13 +31,13 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null);
 const ACTIVE_COMPANY_STORAGE_KEY = "inventory.active_company_id";
-const FIRST_ACCESS_ROUTE = "/seguranca/primeiro-acesso";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [memberships, setMemberships] = useState<CompanyMembership[]>([]);
   const [activeCompanyId, setActiveCompanyIdState] = useState<string | null>(null);
+  const [needsMfa, setNeedsMfa] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -48,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
         setMemberships([]);
         setActiveCompanyIdState(null);
+        setNeedsMfa(false);
       }
     });
     supabase.auth.getSession().then(({ data }) => {
@@ -72,13 +75,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function isSuperAdminProfile(baseProfile: Profile | null) {
-    if (!baseProfile || baseProfile.must_change_password) return false;
+    if (!baseProfile || baseProfile.must_change_password || baseProfile.must_enroll_mfa) {
+      return false;
+    }
     return baseProfile.global_role === "super_admin" || baseProfile.role === "admin";
   }
 
-  function getEffectiveProfile(baseProfile: Profile | null, membership: CompanyMembership | null) {
+  function getEffectiveProfile(
+    baseProfile: Profile | null,
+    membership: CompanyMembership | null,
+    securityLocked = needsMfa,
+  ) {
     if (!baseProfile) return baseProfile;
-    if (baseProfile.must_change_password) {
+    if (baseProfile.must_change_password || baseProfile.must_enroll_mfa || securityLocked) {
       return {
         ...baseProfile,
         permissions: [],
@@ -98,6 +107,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: normalizeCompanyRole(membership.role),
       permissions: membership.permissions,
     };
+  }
+
+  async function getMfaStatus(baseProfile: Profile | null) {
+    if (!baseProfile || baseProfile.must_change_password) {
+      setNeedsMfa(false);
+      return { needsChallenge: false, needsEnrollment: false, needsMfa: false };
+    }
+
+    const [{ data: aal }, { data: factors }] = await Promise.all([
+      supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+      supabase.auth.mfa.listFactors(),
+    ]);
+
+    const currentLevel = aal?.currentLevel ?? "aal1";
+    const nextLevel = aal?.nextLevel ?? "aal1";
+    const hasVerifiedTotp = (factors?.totp ?? []).some((factor) => factor.status === "verified");
+    const needsChallenge = hasVerifiedTotp && nextLevel === "aal2" && currentLevel !== "aal2";
+    const needsEnrollment = baseProfile.must_enroll_mfa && !hasVerifiedTotp;
+    const nextNeedsMfa = needsChallenge || needsEnrollment || baseProfile.must_enroll_mfa;
+
+    setNeedsMfa(nextNeedsMfa);
+    return { needsChallenge, needsEnrollment, needsMfa: nextNeedsMfa };
   }
 
   async function loadMemberships(uid: string, baseProfile: Profile | null) {
@@ -189,6 +220,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMemberships([]);
       setActiveCompanyIdState(null);
       persistActiveCompanyId(null);
+      setNeedsMfa(false);
+      setLoading(false);
+      return nextProfile;
+    }
+
+    const mfaStatus = await getMfaStatus(nextProfile);
+    if (mfaStatus.needsMfa) {
+      setProfile(nextProfile);
+      setMemberships([]);
+      setActiveCompanyIdState(null);
+      persistActiveCompanyId(null);
       setLoading(false);
       return nextProfile;
     }
@@ -202,7 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setProfile(nextProfile);
     setLoading(false);
-    return getEffectiveProfile(nextProfile, selectedMembership);
+    return getEffectiveProfile(nextProfile, selectedMembership, mfaStatus.needsMfa);
   }
 
   const signIn = async (email: string, password: string) => {
@@ -213,10 +255,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut();
       throw new Error("Usuario bloqueado. Fale com o administrador.");
     }
+    const mfaStatus = await getMfaStatus(nextProfile);
     navigate({
       to: nextProfile?.must_change_password
         ? FIRST_ACCESS_ROUTE
-        : (getDefaultRoute(nextProfile) ?? "/"),
+        : mfaStatus.needsMfa
+          ? MFA_ROUTE
+          : (getDefaultRoute(nextProfile) ?? "/"),
     });
   };
 
@@ -266,6 +311,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         companies,
         activeCompany,
         activeMembership,
+        needsMfa,
         loading,
         signIn,
         signOut,

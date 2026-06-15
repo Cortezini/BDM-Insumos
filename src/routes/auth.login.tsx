@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import { getDefaultRoute } from "@/lib/permissions";
+import { FIRST_ACCESS_ROUTE, MFA_ROUTE } from "@/lib/security-routes";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth/login")({ component: LoginPage });
 
 function LoginPage() {
-  const { signIn, user, profile, loading: authLoading } = useAuth();
+  const { signIn, user, profile, needsMfa, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,11 +22,13 @@ function LoginPage() {
     if (user && !authLoading) {
       navigate({
         to: profile?.must_change_password
-          ? "/seguranca/primeiro-acesso"
-          : (getDefaultRoute(profile) ?? "/"),
+          ? FIRST_ACCESS_ROUTE
+          : needsMfa
+            ? MFA_ROUTE
+            : (getDefaultRoute(profile) ?? "/"),
       });
     }
-  }, [user, profile, authLoading, navigate]);
+  }, [user, profile, needsMfa, authLoading, navigate]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
