@@ -1,29 +1,30 @@
 import { useState } from "react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard,
-  Package,
-  Truck,
-  Users,
-  Building2,
-  MapPin,
   ArrowLeftRight,
   BarChart3,
-  Settings,
-  LogOut,
-  Sun,
-  Moon,
-  Search,
-  Bell,
   Boxes,
+  Building2,
   Calculator,
-  Network,
+  LayoutDashboard,
+  LogOut,
+  MapPin,
   Menu,
+  Moon,
+  Network,
+  Package,
   ScrollText,
+  Search,
+  Settings,
+  ShieldCheck,
+  Sun,
+  Truck,
+  UserCog,
+  Users,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme";
-import { canAny, getDefaultRoute, getRoutePermissions } from "@/lib/permissions";
+import { canAny, getDefaultRoute, getRoleLabel, getRoutePermissions } from "@/lib/permissions";
 import type { PermissionKey } from "@/lib/database.types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,29 +49,112 @@ const nav: Array<{
   label: string;
   icon: typeof LayoutDashboard;
   permission: PermissionKey | PermissionKey[];
+  module?: string;
+  global?: boolean;
 }> = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, permission: "dashboard.view" },
-  { to: "/produtos", label: "Produtos", icon: Package, permission: "products.view" },
+  {
+    to: "/admin-saas/empresas",
+    label: "Admin SaaS / Empresas",
+    icon: Building2,
+    permission: "saas.companies.view",
+    global: true,
+  },
+  {
+    to: "/admin-saas/usuarios",
+    label: "Admin SaaS / Usuarios",
+    icon: ShieldCheck,
+    permission: "saas.users.view",
+    global: true,
+  },
+  {
+    to: "/usuarios-empresa",
+    label: "Usuarios da Empresa",
+    icon: UserCog,
+    permission: "company.users.view",
+  },
+  {
+    to: "/",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    permission: "dashboard.view",
+    module: "dashboard",
+  },
+  {
+    to: "/produtos",
+    label: "Produtos",
+    icon: Package,
+    permission: "products.view",
+    module: "products",
+  },
   {
     to: "/movimentacoes",
-    label: "Movimentações",
+    label: "Movimentacoes",
     icon: ArrowLeftRight,
     permission: ["movements.view", "movements.view_in", "movements.view_out"],
+    module: "movements",
   },
-  { to: "/fornecedores", label: "Fornecedores", icon: Truck, permission: "suppliers.view" },
-  { to: "/quotations", label: "Cotações", icon: Calculator, permission: "quotations.view" },
-  { to: "/assets", label: "Ativos de TI", icon: Network, permission: "assets.view" },
-  { to: "/pessoas", label: "Pessoas", icon: Users, permission: "people.view" },
+  {
+    to: "/fornecedores",
+    label: "Fornecedores",
+    icon: Truck,
+    permission: "suppliers.view",
+    module: "suppliers",
+  },
+  {
+    to: "/quotations",
+    label: "Cotacoes",
+    icon: Calculator,
+    permission: "quotations.view",
+    module: "quotations",
+  },
+  {
+    to: "/assets",
+    label: "Ativos de TI",
+    icon: Network,
+    permission: "assets.view",
+    module: "assets",
+  },
+  {
+    to: "/pessoas",
+    label: "Pessoas",
+    icon: Users,
+    permission: "people.view",
+    module: "people",
+  },
   {
     to: "/centros-de-custo",
     label: "Centros de Custo",
     icon: Building2,
     permission: "cost_centers.view",
+    module: "cost_centers",
   },
-  { to: "/localizacoes", label: "Localizações", icon: MapPin, permission: "locations.view" },
-  { to: "/relatorios", label: "Relatórios", icon: BarChart3, permission: "reports.view" },
-  { to: "/configuracoes", label: "Configurações", icon: Settings, permission: "settings.view" },
-  { to: "/logs", label: "Logs", icon: ScrollText, permission: "audit_logs.view" },
+  {
+    to: "/localizacoes",
+    label: "Localizacoes",
+    icon: MapPin,
+    permission: "locations.view",
+    module: "locations",
+  },
+  {
+    to: "/relatorios",
+    label: "Relatorios",
+    icon: BarChart3,
+    permission: "reports.view",
+    module: "reports",
+  },
+  {
+    to: "/configuracoes",
+    label: "Configuracoes",
+    icon: Settings,
+    permission: "settings.view",
+  },
+  {
+    to: "/logs",
+    label: "Logs",
+    icon: ScrollText,
+    permission: "audit_logs.view",
+    module: "audit_logs",
+  },
 ];
 
 function isActivePath(pathname: string, to: string) {
@@ -85,7 +169,14 @@ export function AppShell() {
   const routePermissions = getRoutePermissions(pathname);
   const hasRouteAccess = !routePermissions || canAny(profile, routePermissions);
   const defaultRoute = getDefaultRoute(profile);
-  const visibleNav = nav.filter((item) => canAny(profile, item.permission));
+  const enabledModules = new Set(activeCompany?.modules ?? []);
+  const visibleNav = nav.filter((item) => {
+    if (!canAny(profile, item.permission)) return false;
+    if (item.global) return true;
+    if (!item.module) return true;
+    if (!activeCompany?.modules?.length) return true;
+    return enabledModules.has(item.module);
+  });
   const userInitial = (profile?.full_name ?? profile?.email ?? "?").slice(0, 1).toUpperCase();
 
   const renderNavLink = (item: (typeof nav)[number], mobile = false) => {
@@ -122,7 +213,7 @@ export function AppShell() {
           </div>
           <div>
             <div className="font-semibold text-sm leading-none">BDM</div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">Gestão de Insumos</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">Gestao de Insumos</div>
           </div>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -137,7 +228,7 @@ export function AppShell() {
               <div className="text-sm font-medium truncate">
                 {profile?.full_name ?? profile?.email}
               </div>
-              <div className="text-[11px] text-muted-foreground capitalize">{profile?.role}</div>
+              <div className="text-[11px] text-muted-foreground">{getRoleLabel(profile?.role)}</div>
             </div>
             <Button size="icon" variant="ghost" onClick={signOut} title="Sair">
               <LogOut className="size-4" />
@@ -169,7 +260,7 @@ export function AppShell() {
                         BDM
                       </SheetTitle>
                       <SheetDescription className="mt-0.5 text-[11px] text-muted-foreground">
-                        Gestão de Insumos
+                        Gestao de Insumos
                       </SheetDescription>
                     </div>
                   </div>
@@ -186,8 +277,8 @@ export function AppShell() {
                       <div className="text-sm font-medium truncate">
                         {profile?.full_name ?? profile?.email}
                       </div>
-                      <div className="text-[11px] text-muted-foreground capitalize">
-                        {profile?.role}
+                      <div className="text-[11px] text-muted-foreground">
+                        {getRoleLabel(profile?.role)}
                       </div>
                     </div>
                     <Button
@@ -212,7 +303,7 @@ export function AppShell() {
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold leading-none">BDM</div>
-                <div className="text-[11px] text-muted-foreground truncate">Gestão de Insumos</div>
+                <div className="text-[11px] text-muted-foreground truncate">Gestao de Insumos</div>
               </div>
             </div>
 
@@ -250,9 +341,6 @@ export function AppShell() {
               <Button size="icon" variant="ghost" onClick={toggle} title="Alternar tema">
                 {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
               </Button>
-              <Button size="icon" variant="ghost" title="Notificações">
-                <Bell className="size-4" />
-              </Button>
             </div>
           </div>
         </header>
@@ -264,7 +352,7 @@ export function AppShell() {
               <div className="max-w-md text-center">
                 <h1 className="text-2xl font-semibold tracking-tight">Acesso restrito</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Seu usuário não tem permissão para acessar esta tela.
+                  Seu usuario nao tem permissao para acessar esta tela.
                 </p>
                 {defaultRoute && (
                   <Button asChild className="mt-4">

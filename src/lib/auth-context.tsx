@@ -9,7 +9,7 @@ import type {
   Profile,
   UserRole,
 } from "./database.types";
-import { can, getDefaultRoute } from "./permissions";
+import { ALL_PERMISSIONS, can, getDefaultRoute, normalizeCompanyRole } from "./permissions";
 
 interface AuthCtx {
   user: User | null;
@@ -69,19 +69,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  function isSuperAdminProfile(baseProfile: Profile | null) {
+    return baseProfile?.global_role === "super_admin" || baseProfile?.role === "admin";
+  }
+
   function getEffectiveProfile(baseProfile: Profile | null, membership: CompanyMembership | null) {
-    if (!baseProfile || !membership) return baseProfile;
+    if (!baseProfile) return baseProfile;
+    if (isSuperAdminProfile(baseProfile)) {
+      return {
+        ...baseProfile,
+        role: "super_admin" as UserRole,
+        permissions: ALL_PERMISSIONS.map((permission) => permission.key),
+      };
+    }
+    if (!membership) return baseProfile;
+
     return {
       ...baseProfile,
-      role: membership.role,
+      role: normalizeCompanyRole(membership.role),
       permissions: membership.permissions,
     };
   }
 
-  async function loadMemberships(uid: string) {
+  async function loadMemberships(uid: string, baseProfile: Profile | null) {
+    if (isSuperAdminProfile(baseProfile)) {
+      const { data, error } = await db
+        .from("companies")
+        .select("id, name, document, active, plan, user_limit, modules, created_at, updated_at")
+        .eq("active", true)
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.warn("[Auth] Nao foi possivel carregar empresas do Super Admin.", error.message);
+        setMemberships([]);
+        setActiveCompanyIdState(null);
+        return [];
+      }
+
+      const nextMemberships = ((data ?? []) as Company[]).map(
+        (company): CompanyMembership => ({
+          id: `super-${company.id}`,
+          company_id: company.id,
+          user_id: uid,
+          role: "admin_empresa",
+          permissions: [],
+          active: company.active,
+          created_at: company.created_at,
+          company,
+        }),
+      );
+
+      const storedCompanyId = getStoredActiveCompanyId();
+      const nextCompanyId =
+        nextMemberships.find((membership) => membership.company_id === storedCompanyId)
+          ?.company_id ??
+        nextMemberships[0]?.company_id ??
+        null;
+
+      setMemberships(nextMemberships);
+      setActiveCompanyIdState(nextCompanyId);
+      persistActiveCompanyId(nextCompanyId);
+
+      return nextMemberships;
+    }
+
     const { data, error } = await db
       .from("company_members")
-      .select("*, company:companies(id, name, document, active, created_at)")
+      .select(
+        "*, company:companies(id, name, document, active, plan, user_limit, modules, created_at, updated_at)",
+      )
       .eq("user_id", uid)
       .eq("active", true)
       .order("created_at", { ascending: true });
@@ -110,7 +166,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function loadProfile(uid: string) {
     const { data } = await db.from("profiles").select("*").eq("id", uid).maybeSingle();
     const nextProfile = (data as Profile | null) ?? null;
-    const nextMemberships = await loadMemberships(uid);
+    if (nextProfile?.blocked) {
+      setProfile(nextProfile);
+      setMemberships([]);
+      setActiveCompanyIdState(null);
+      persistActiveCompanyId(null);
+      setLoading(false);
+      return nextProfile;
+    }
+
+    const nextMemberships = await loadMemberships(uid, nextProfile);
     const storedCompanyId = getStoredActiveCompanyId();
     const selectedMembership =
       nextMemberships.find((membership) => membership.company_id === storedCompanyId) ??
@@ -126,6 +191,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     const nextProfile = data.user ? await loadProfile(data.user.id) : null;
+    if (nextProfile?.blocked) {
+      await supabase.auth.signOut();
+      throw new Error("Usuario bloqueado. Fale com o administrador.");
+    }
     navigate({ to: getDefaultRoute(nextProfile) ?? "/" });
   };
 
@@ -148,10 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => memberships.map((membership) => membership.company).filter(Boolean) as Company[],
     [memberships],
   );
-  const effectiveProfile = useMemo(
-    () => getEffectiveProfile(profile, activeMembership),
-    [activeMembership, profile],
-  );
+  const effectiveProfile = getEffectiveProfile(profile, activeMembership);
 
   const setActiveCompanyId = (companyId: string) => {
     if (!memberships.some((membership) => membership.company_id === companyId)) return;

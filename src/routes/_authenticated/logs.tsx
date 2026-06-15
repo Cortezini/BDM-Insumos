@@ -34,6 +34,15 @@ const actionLabels: Record<string, string> = {
   quotation_updated: "Cotação atualizada",
   quotation_status_updated: "Status atualizado",
   stock_in: "Entrada",
+  company_user_created: "Usuario criado",
+  company_user_membership_created: "Usuario vinculado",
+  company_user_membership_updated: "Usuario atualizado",
+  company_user_blocked: "Usuario bloqueado",
+  company_user_unblocked: "Usuario desbloqueado",
+  company_created: "Empresa criada",
+  company_updated: "Empresa atualizada",
+  company_status_updated: "Status da empresa",
+  user_global_role_updated: "Perfil global",
   stock_out: "Saída",
   company_user_permissions_updated: "Permissões da empresa",
   user_permissions_updated: "Permissões",
@@ -47,6 +56,15 @@ const actionClasses: Record<string, string> = {
   quotation_approved: "bg-green-500/10 text-green-600 border-green-500/20",
   quotation_rejected: "bg-destructive/10 text-destructive border-destructive/20",
   stock_in: "bg-[color:var(--success)]/15 text-[color:var(--success)] border-transparent",
+  company_user_created: "bg-green-500/10 text-green-600 border-green-500/20",
+  company_user_membership_created: "bg-green-500/10 text-green-600 border-green-500/20",
+  company_user_membership_updated: "bg-violet-500/10 text-violet-600 border-violet-500/20",
+  company_user_blocked: "bg-destructive/10 text-destructive border-destructive/20",
+  company_user_unblocked: "bg-green-500/10 text-green-600 border-green-500/20",
+  company_created: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+  company_updated: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20",
+  company_status_updated: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  user_global_role_updated: "bg-violet-500/10 text-violet-600 border-violet-500/20",
   stock_out: "bg-amber-500/10 text-amber-600 border-amber-500/20",
   company_user_permissions_updated: "bg-violet-500/10 text-violet-600 border-violet-500/20",
   user_permissions_updated: "bg-violet-500/10 text-violet-600 border-violet-500/20",
@@ -138,7 +156,9 @@ function LogsPage() {
     queryFn: async () => {
       const { data, error } = await db
         .from("company_members")
-        .select("user_id, role, permissions, profile:profiles(id, email, full_name, created_at)")
+        .select(
+          "user_id, role, permissions, profile:profiles(id, email, full_name, global_role, blocked, blocked_at, blocked_by, created_at)",
+        )
         .eq("company_id", companyId);
       if (error) throw error;
       return (
@@ -146,12 +166,26 @@ function LogsPage() {
           user_id: string;
           role: Profile["role"];
           permissions: Profile["permissions"];
-          profile: Pick<Profile, "id" | "email" | "full_name" | "created_at"> | null;
+          profile: Pick<
+            Profile,
+            | "id"
+            | "email"
+            | "full_name"
+            | "global_role"
+            | "blocked"
+            | "blocked_at"
+            | "blocked_by"
+            | "created_at"
+          > | null;
         }[]
       ).map((row) => ({
         id: row.user_id,
         email: row.profile?.email ?? "",
         full_name: row.profile?.full_name ?? null,
+        global_role: row.profile?.global_role ?? null,
+        blocked: row.profile?.blocked ?? false,
+        blocked_at: row.profile?.blocked_at ?? null,
+        blocked_by: row.profile?.blocked_by ?? null,
         role: row.role,
         permissions: row.permissions,
         created_at: row.profile?.created_at ?? "",

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
+import { Route as AuthenticatedUsuariosEmpresaRouteImport } from './routes/_authenticated/usuarios-empresa'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedQuotationsRouteImport } from './routes/_authenticated/quotations'
 import { Route as AuthenticatedProdutosRouteImport } from './routes/_authenticated/produtos'
@@ -23,6 +24,8 @@ import { Route as AuthenticatedFornecedoresRouteImport } from './routes/_authent
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCentrosDeCustoRouteImport } from './routes/_authenticated/centros-de-custo'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
+import { Route as AuthenticatedAdminSaasUsuariosRouteImport } from './routes/_authenticated/admin-saas/usuarios'
+import { Route as AuthenticatedAdminSaasEmpresasRouteImport } from './routes/_authenticated/admin-saas/empresas'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -38,6 +41,12 @@ const AuthLoginRoute = AuthLoginRouteImport.update({
   path: '/auth/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedUsuariosEmpresaRoute =
+  AuthenticatedUsuariosEmpresaRouteImport.update({
+    id: '/usuarios-empresa',
+    path: '/usuarios-empresa',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
@@ -98,6 +107,18 @@ const AuthenticatedAssetsRoute = AuthenticatedAssetsRouteImport.update({
   path: '/assets',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAdminSaasUsuariosRoute =
+  AuthenticatedAdminSaasUsuariosRouteImport.update({
+    id: '/admin-saas/usuarios',
+    path: '/admin-saas/usuarios',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminSaasEmpresasRoute =
+  AuthenticatedAdminSaasEmpresasRouteImport.update({
+    id: '/admin-saas/empresas',
+    path: '/admin-saas/empresas',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -112,7 +133,10 @@ export interface FileRoutesByFullPath {
   '/produtos': typeof AuthenticatedProdutosRoute
   '/quotations': typeof AuthenticatedQuotationsRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/usuarios-empresa': typeof AuthenticatedUsuariosEmpresaRoute
   '/auth/login': typeof AuthLoginRoute
+  '/admin-saas/empresas': typeof AuthenticatedAdminSaasEmpresasRoute
+  '/admin-saas/usuarios': typeof AuthenticatedAdminSaasUsuariosRoute
 }
 export interface FileRoutesByTo {
   '/assets': typeof AuthenticatedAssetsRoute
@@ -126,8 +150,11 @@ export interface FileRoutesByTo {
   '/produtos': typeof AuthenticatedProdutosRoute
   '/quotations': typeof AuthenticatedQuotationsRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/usuarios-empresa': typeof AuthenticatedUsuariosEmpresaRoute
   '/auth/login': typeof AuthLoginRoute
   '/': typeof AuthenticatedIndexRoute
+  '/admin-saas/empresas': typeof AuthenticatedAdminSaasEmpresasRoute
+  '/admin-saas/usuarios': typeof AuthenticatedAdminSaasUsuariosRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -143,8 +170,11 @@ export interface FileRoutesById {
   '/_authenticated/produtos': typeof AuthenticatedProdutosRoute
   '/_authenticated/quotations': typeof AuthenticatedQuotationsRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/_authenticated/usuarios-empresa': typeof AuthenticatedUsuariosEmpresaRoute
   '/auth/login': typeof AuthLoginRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/admin-saas/empresas': typeof AuthenticatedAdminSaasEmpresasRoute
+  '/_authenticated/admin-saas/usuarios': typeof AuthenticatedAdminSaasUsuariosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,7 +191,10 @@ export interface FileRouteTypes {
     | '/produtos'
     | '/quotations'
     | '/relatorios'
+    | '/usuarios-empresa'
     | '/auth/login'
+    | '/admin-saas/empresas'
+    | '/admin-saas/usuarios'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/assets'
@@ -175,8 +208,11 @@ export interface FileRouteTypes {
     | '/produtos'
     | '/quotations'
     | '/relatorios'
+    | '/usuarios-empresa'
     | '/auth/login'
     | '/'
+    | '/admin-saas/empresas'
+    | '/admin-saas/usuarios'
   id:
     | '__root__'
     | '/_authenticated'
@@ -191,8 +227,11 @@ export interface FileRouteTypes {
     | '/_authenticated/produtos'
     | '/_authenticated/quotations'
     | '/_authenticated/relatorios'
+    | '/_authenticated/usuarios-empresa'
     | '/auth/login'
     | '/_authenticated/'
+    | '/_authenticated/admin-saas/empresas'
+    | '/_authenticated/admin-saas/usuarios'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -222,6 +261,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/login'
       preLoaderRoute: typeof AuthLoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/usuarios-empresa': {
+      id: '/_authenticated/usuarios-empresa'
+      path: '/usuarios-empresa'
+      fullPath: '/usuarios-empresa'
+      preLoaderRoute: typeof AuthenticatedUsuariosEmpresaRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/relatorios': {
       id: '/_authenticated/relatorios'
@@ -300,6 +346,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAssetsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin-saas/usuarios': {
+      id: '/_authenticated/admin-saas/usuarios'
+      path: '/admin-saas/usuarios'
+      fullPath: '/admin-saas/usuarios'
+      preLoaderRoute: typeof AuthenticatedAdminSaasUsuariosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin-saas/empresas': {
+      id: '/_authenticated/admin-saas/empresas'
+      path: '/admin-saas/empresas'
+      fullPath: '/admin-saas/empresas'
+      preLoaderRoute: typeof AuthenticatedAdminSaasEmpresasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -315,7 +375,10 @@ interface AuthenticatedRouteChildren {
   AuthenticatedProdutosRoute: typeof AuthenticatedProdutosRoute
   AuthenticatedQuotationsRoute: typeof AuthenticatedQuotationsRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
+  AuthenticatedUsuariosEmpresaRoute: typeof AuthenticatedUsuariosEmpresaRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedAdminSaasEmpresasRoute: typeof AuthenticatedAdminSaasEmpresasRoute
+  AuthenticatedAdminSaasUsuariosRoute: typeof AuthenticatedAdminSaasUsuariosRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -330,7 +393,10 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedProdutosRoute: AuthenticatedProdutosRoute,
   AuthenticatedQuotationsRoute: AuthenticatedQuotationsRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
+  AuthenticatedUsuariosEmpresaRoute: AuthenticatedUsuariosEmpresaRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedAdminSaasEmpresasRoute: AuthenticatedAdminSaasEmpresasRoute,
+  AuthenticatedAdminSaasUsuariosRoute: AuthenticatedAdminSaasUsuariosRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

@@ -49,7 +49,7 @@ function Page() {
       const { data, error } = await db
         .from("company_members")
         .select(
-          "id, company_id, user_id, role, permissions, profile:profiles(id, email, full_name, created_at)",
+          "id, company_id, user_id, role, permissions, profile:profiles(id, email, full_name, global_role, blocked, blocked_at, blocked_by, created_at)",
         )
         .eq("company_id", activeCompany!.id)
         .order("created_at", { ascending: false });
@@ -62,7 +62,17 @@ function Page() {
           user_id: string;
           role: UserRole;
           permissions: PermissionKey[] | null;
-          profile: Pick<Profile, "id" | "email" | "full_name" | "created_at"> | null;
+          profile: Pick<
+            Profile,
+            | "id"
+            | "email"
+            | "full_name"
+            | "global_role"
+            | "blocked"
+            | "blocked_at"
+            | "blocked_by"
+            | "created_at"
+          > | null;
         }[]
       ).map((row) => ({
         id: row.user_id,
@@ -70,6 +80,10 @@ function Page() {
         company_id: row.company_id,
         email: row.profile?.email ?? "",
         full_name: row.profile?.full_name ?? null,
+        global_role: row.profile?.global_role ?? null,
+        blocked: row.profile?.blocked ?? false,
+        blocked_at: row.profile?.blocked_at ?? null,
+        blocked_by: row.profile?.blocked_by ?? null,
         role: row.role,
         permissions: row.permissions,
         created_at: row.profile?.created_at ?? "",

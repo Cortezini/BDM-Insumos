@@ -2,8 +2,18 @@
 // You can regenerate richer types with `supabase gen types typescript`.
 export type Database = Record<string, unknown>;
 
-export type UserRole = "admin" | "operator" | "viewer";
+export type LegacyUserRole = "admin" | "operator" | "viewer";
+export type GlobalRole = "super_admin" | "suporte" | "financeiro" | "comercial";
+export type CompanyRole = "admin_empresa" | "gestor" | "almoxarife" | "solicitante" | "auditor";
+export type UserRole = LegacyUserRole | GlobalRole | CompanyRole;
 export type PermissionKey =
+  | "saas.companies.view"
+  | "saas.companies.manage"
+  | "saas.users.view"
+  | "saas.users.manage"
+  | "saas.logs.view"
+  | "company.users.view"
+  | "company.users.manage"
   | "dashboard.view"
   | "products.view"
   | "movements.view"
@@ -28,15 +38,24 @@ export interface Profile {
   full_name: string | null;
   role: UserRole;
   permissions: PermissionKey[] | null;
+  global_role: GlobalRole | null;
+  blocked: boolean;
+  blocked_at: string | null;
+  blocked_by: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Company {
   id: string;
   name: string;
   document: string | null;
+  plan: string;
+  user_limit: number;
+  modules: string[];
   active: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface CompanyMembership {
