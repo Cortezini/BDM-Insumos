@@ -53,26 +53,6 @@ const nav: Array<{
   global?: boolean;
 }> = [
   {
-    to: "/admin-saas/empresas",
-    label: "Admin SaaS / Empresas",
-    icon: Building2,
-    permission: "saas.companies.view",
-    global: true,
-  },
-  {
-    to: "/admin-saas/usuarios",
-    label: "Admin SaaS / Usuarios",
-    icon: ShieldCheck,
-    permission: "saas.users.view",
-    global: true,
-  },
-  {
-    to: "/usuarios-empresa",
-    label: "Usuarios da Empresa",
-    icon: UserCog,
-    permission: "company.users.view",
-  },
-  {
     to: "/",
     label: "Dashboard",
     icon: LayoutDashboard,
@@ -147,6 +127,26 @@ const nav: Array<{
     label: "Configuracoes",
     icon: Settings,
     permission: "settings.view",
+  },
+  {
+    to: "/admin-saas/empresas",
+    label: "Admin SaaS / Empresas",
+    icon: Building2,
+    permission: "saas.companies.view",
+    global: true,
+  },
+  {
+    to: "/admin-saas/usuarios",
+    label: "Admin SaaS / Usuarios",
+    icon: ShieldCheck,
+    permission: "saas.users.view",
+    global: true,
+  },
+  {
+    to: "/usuarios-empresa",
+    label: "Usuarios da Empresa",
+    icon: UserCog,
+    permission: "company.users.view",
   },
   {
     to: "/logs",
