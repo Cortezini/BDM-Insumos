@@ -22,8 +22,18 @@ type MfaActionResponse = {
   profile: Profile;
 };
 
-function svgToDataUrl(svg: string) {
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+const TOTP_FRIENDLY_NAME = "Google Authenticator";
+
+function isDuplicateFriendlyNameError(error: Error | null) {
+  return /friendly name/i.test(error?.message ?? "");
+}
+
+function toQrImageSource(qrCode: string) {
+  const value = qrCode.trim();
+  if (!value) return "";
+  if (value.startsWith("data:image/") || value.startsWith("http")) return value;
+  if (value.startsWith("<svg")) return `data:image/svg+xml;utf8,${encodeURIComponent(value)}`;
+  return value;
 }
 
 function sanitizeCode(value: string) {
@@ -56,17 +66,58 @@ function MfaPage() {
   }, [goToDefaultRoute, profile?.must_enroll_mfa, refreshProfile]);
 
   const startEnrollment = useCallback(async () => {
-    const { data, error } = await supabase.auth.mfa.enroll({
-      factorType: "totp",
-      friendlyName: "Google Authenticator",
-    });
-    if (error) throw error;
+    const { data: existingFactors, error: factorsError } = await supabase.auth.mfa.listFactors();
+    if (factorsError) throw factorsError;
 
-    setFactorId(data.id);
-    setQrCode(data.totp.qr_code);
-    setSecret(data.totp.secret);
+    const totpFactors = existingFactors?.totp ?? [];
+    const verifiedFactor = totpFactors.find((factor) => factor.status === "verified");
+    if (verifiedFactor) {
+      setFactorId(verifiedFactor.id);
+      setMode("challenge");
+      return;
+    }
+
+    for (const factor of totpFactors) {
+      const { error } = await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      if (error) throw error;
+    }
+
+    let enrollment = await supabase.auth.mfa.enroll({
+      factorType: "totp",
+      friendlyName: TOTP_FRIENDLY_NAME,
+    });
+
+    if (isDuplicateFriendlyNameError(enrollment.error)) {
+      enrollment = await supabase.auth.mfa.enroll({
+        factorType: "totp",
+        friendlyName: `${TOTP_FRIENDLY_NAME} ${Date.now()}`,
+      });
+    }
+
+    if (enrollment.error) throw enrollment.error;
+
+    setFactorId(enrollment.data.id);
+    setQrCode(enrollment.data.totp.qr_code);
+    setSecret(enrollment.data.totp.secret);
     setMode("enroll");
   }, []);
+
+  const regenerateQrCode = async () => {
+    setSaving(true);
+    setCode("");
+    setQrCode("");
+    setSecret("");
+    try {
+      await startEnrollment();
+      toast.success("Novo QR Code gerado");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Nao foi possivel gerar um novo QR Code.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const loadMfaState = useCallback(async () => {
     try {
@@ -180,21 +231,36 @@ function MfaPage() {
             </div>
           ) : (
             <form className="space-y-5" onSubmit={submit}>
-              {mode === "enroll" && qrCode && (
+              {mode === "enroll" && (
                 <div className="grid gap-3">
-                  <div className="grid place-items-center rounded-md border border-border bg-white p-4">
-                    <img
-                      src={svgToDataUrl(qrCode)}
-                      alt="QR Code para Google Authenticator"
-                      className="size-52"
-                    />
-                  </div>
+                  {qrCode ? (
+                    <div className="grid place-items-center rounded-md border border-border bg-white p-4">
+                      <img
+                        src={toQrImageSource(qrCode)}
+                        alt="QR Code para Google Authenticator"
+                        className="size-52"
+                      />
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-border p-3 text-sm text-muted-foreground">
+                      O QR Code nao foi retornado. Use a chave manual abaixo ou gere um novo QR
+                      Code.
+                    </div>
+                  )}
                   {secret && (
                     <div className="rounded-md border border-border p-3">
                       <div className="text-xs font-medium text-muted-foreground">Chave manual</div>
                       <div className="mt-1 break-all font-mono text-sm">{secret}</div>
                     </div>
                   )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={saving}
+                    onClick={() => void regenerateQrCode()}
+                  >
+                    Gerar novo QR Code
+                  </Button>
                 </div>
               )}
 
