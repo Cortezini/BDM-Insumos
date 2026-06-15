@@ -42,6 +42,12 @@ export interface Profile {
   blocked: boolean;
   blocked_at: string | null;
   blocked_by: string | null;
+  must_change_password: boolean;
+  password_change_required_at: string | null;
+  password_changed_at: string | null;
+  first_login_completed_at: string | null;
+  invited_at: string | null;
+  last_login_at: string | null;
   created_at: string;
   updated_at?: string;
 }

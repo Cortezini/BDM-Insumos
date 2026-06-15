@@ -21,6 +21,7 @@ interface AuthCtx {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<Profile | null>;
   setActiveCompanyId: (companyId: string) => void;
   hasRole: (...roles: UserRole[]) => boolean;
   hasPermission: (permission: PermissionKey) => boolean;
@@ -28,6 +29,7 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null);
 const ACTIVE_COMPANY_STORAGE_KEY = "inventory.active_company_id";
+const FIRST_ACCESS_ROUTE = "/seguranca/primeiro-acesso";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -70,11 +72,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function isSuperAdminProfile(baseProfile: Profile | null) {
-    return baseProfile?.global_role === "super_admin" || baseProfile?.role === "admin";
+    if (!baseProfile || baseProfile.must_change_password) return false;
+    return baseProfile.global_role === "super_admin" || baseProfile.role === "admin";
   }
 
   function getEffectiveProfile(baseProfile: Profile | null, membership: CompanyMembership | null) {
     if (!baseProfile) return baseProfile;
+    if (baseProfile.must_change_password) {
+      return {
+        ...baseProfile,
+        permissions: [],
+      };
+    }
     if (isSuperAdminProfile(baseProfile)) {
       return {
         ...baseProfile,
@@ -175,6 +184,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return nextProfile;
     }
 
+    if (nextProfile?.must_change_password) {
+      setProfile(nextProfile);
+      setMemberships([]);
+      setActiveCompanyIdState(null);
+      persistActiveCompanyId(null);
+      setLoading(false);
+      return nextProfile;
+    }
+
     const nextMemberships = await loadMemberships(uid, nextProfile);
     const storedCompanyId = getStoredActiveCompanyId();
     const selectedMembership =
@@ -195,12 +213,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut();
       throw new Error("Usuario bloqueado. Fale com o administrador.");
     }
-    navigate({ to: getDefaultRoute(nextProfile) ?? "/" });
+    navigate({
+      to: nextProfile?.must_change_password
+        ? FIRST_ACCESS_ROUTE
+        : (getDefaultRoute(nextProfile) ?? "/"),
+    });
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
     navigate({ to: "/auth/login" });
+  };
+
+  const refreshProfile = async () => {
+    const uid = session?.user?.id;
+    if (!uid) return null;
+    return loadProfile(uid);
   };
 
   const activeMembership = useMemo(() => {
@@ -241,6 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         signIn,
         signOut,
+        refreshProfile,
         setActiveCompanyId,
         hasRole,
         hasPermission,

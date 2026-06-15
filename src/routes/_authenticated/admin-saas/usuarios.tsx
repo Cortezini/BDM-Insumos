@@ -55,7 +55,6 @@ type UserForm = {
   companyId: string;
   fullName: string;
   email: string;
-  password: string;
   role: CompanyRole;
 };
 
@@ -64,7 +63,6 @@ function emptyForm(companyId = ""): UserForm {
     companyId,
     fullName: "",
     email: "",
-    password: "",
     role: "solicitante",
   };
 }
@@ -114,12 +112,12 @@ function SaasUsersPage() {
         companyId: form.companyId,
         fullName: form.fullName,
         email: form.email,
-        password: form.password,
+        redirectTo: `${window.location.origin}/seguranca/primeiro-acesso`,
         role: form.role,
         permissions: DEFAULT_COMPANY_ROLE_PERMISSIONS[form.role],
       }),
     onSuccess: () => {
-      toast.success("Usuario criado");
+      toast.success("Convite enviado ao usuario");
       setOpen(false);
       invalidate();
     },
@@ -247,6 +245,7 @@ function SaasUsersPage() {
             <Badge variant={row.active ? "default" : "secondary"}>
               {row.active ? "Ativo na empresa" : "Inativo na empresa"}
             </Badge>
+            {row.profile?.must_change_password && <Badge variant="outline">Primeiro acesso</Badge>}
             {row.profile?.blocked && <Badge variant="destructive">Bloqueado</Badge>}
           </div>
         ),
@@ -356,15 +355,6 @@ function SaasUsersPage() {
                 required
               />
             </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Senha temporaria</Label>
-              <Input
-                type="password"
-                value={form.password}
-                onChange={(event) => update("password", event.target.value)}
-              />
-            </div>
-
             <DialogFooter className="md:col-span-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancelar

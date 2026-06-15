@@ -38,7 +38,6 @@ type CompanyForm = {
   active: boolean;
   firstAdminName: string;
   firstAdminEmail: string;
-  firstAdminPassword: string;
 };
 
 const planOptions = [
@@ -57,7 +56,6 @@ function emptyForm(): CompanyForm {
     active: true,
     firstAdminName: "",
     firstAdminEmail: "",
-    firstAdminPassword: "",
   };
 }
 
@@ -72,7 +70,6 @@ function formFromCompany(company: Company): CompanyForm {
     active: company.active,
     firstAdminName: "",
     firstAdminEmail: "",
-    firstAdminPassword: "",
   };
 }
 
@@ -108,7 +105,7 @@ function CompaniesPage() {
           : {
               fullName: form.firstAdminName,
               email: form.firstAdminEmail,
-              password: form.firstAdminPassword,
+              redirectTo: `${window.location.origin}/seguranca/primeiro-acesso`,
             },
       };
 
@@ -289,7 +286,7 @@ function CompaniesPage() {
             {!isEditing && (
               <div className="rounded-md border border-border p-4">
                 <h3 className="text-sm font-semibold">Primeiro Admin da Empresa</h3>
-                <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Nome</Label>
                     <Input
@@ -303,14 +300,6 @@ function CompaniesPage() {
                       type="email"
                       value={form.firstAdminEmail}
                       onChange={(event) => update("firstAdminEmail", event.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Senha temporaria</Label>
-                    <Input
-                      type="password"
-                      value={form.firstAdminPassword}
-                      onChange={(event) => update("firstAdminPassword", event.target.value)}
                     />
                   </div>
                 </div>

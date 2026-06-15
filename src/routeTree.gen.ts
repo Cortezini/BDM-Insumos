@@ -24,6 +24,7 @@ import { Route as AuthenticatedFornecedoresRouteImport } from './routes/_authent
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCentrosDeCustoRouteImport } from './routes/_authenticated/centros-de-custo'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
+import { Route as AuthenticatedSegurancaPrimeiroAcessoRouteImport } from './routes/_authenticated/seguranca/primeiro-acesso'
 import { Route as AuthenticatedAdminSaasUsuariosRouteImport } from './routes/_authenticated/admin-saas/usuarios'
 import { Route as AuthenticatedAdminSaasEmpresasRouteImport } from './routes/_authenticated/admin-saas/empresas'
 
@@ -107,6 +108,12 @@ const AuthenticatedAssetsRoute = AuthenticatedAssetsRouteImport.update({
   path: '/assets',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSegurancaPrimeiroAcessoRoute =
+  AuthenticatedSegurancaPrimeiroAcessoRouteImport.update({
+    id: '/seguranca/primeiro-acesso',
+    path: '/seguranca/primeiro-acesso',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminSaasUsuariosRoute =
   AuthenticatedAdminSaasUsuariosRouteImport.update({
     id: '/admin-saas/usuarios',
@@ -137,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/auth/login': typeof AuthLoginRoute
   '/admin-saas/empresas': typeof AuthenticatedAdminSaasEmpresasRoute
   '/admin-saas/usuarios': typeof AuthenticatedAdminSaasUsuariosRoute
+  '/seguranca/primeiro-acesso': typeof AuthenticatedSegurancaPrimeiroAcessoRoute
 }
 export interface FileRoutesByTo {
   '/assets': typeof AuthenticatedAssetsRoute
@@ -155,6 +163,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/admin-saas/empresas': typeof AuthenticatedAdminSaasEmpresasRoute
   '/admin-saas/usuarios': typeof AuthenticatedAdminSaasUsuariosRoute
+  '/seguranca/primeiro-acesso': typeof AuthenticatedSegurancaPrimeiroAcessoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -175,6 +184,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin-saas/empresas': typeof AuthenticatedAdminSaasEmpresasRoute
   '/_authenticated/admin-saas/usuarios': typeof AuthenticatedAdminSaasUsuariosRoute
+  '/_authenticated/seguranca/primeiro-acesso': typeof AuthenticatedSegurancaPrimeiroAcessoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -195,6 +205,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/admin-saas/empresas'
     | '/admin-saas/usuarios'
+    | '/seguranca/primeiro-acesso'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/assets'
@@ -213,6 +224,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin-saas/empresas'
     | '/admin-saas/usuarios'
+    | '/seguranca/primeiro-acesso'
   id:
     | '__root__'
     | '/_authenticated'
@@ -232,6 +244,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/admin-saas/empresas'
     | '/_authenticated/admin-saas/usuarios'
+    | '/_authenticated/seguranca/primeiro-acesso'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -346,6 +359,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAssetsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/seguranca/primeiro-acesso': {
+      id: '/_authenticated/seguranca/primeiro-acesso'
+      path: '/seguranca/primeiro-acesso'
+      fullPath: '/seguranca/primeiro-acesso'
+      preLoaderRoute: typeof AuthenticatedSegurancaPrimeiroAcessoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin-saas/usuarios': {
       id: '/_authenticated/admin-saas/usuarios'
       path: '/admin-saas/usuarios'
@@ -379,6 +399,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAdminSaasEmpresasRoute: typeof AuthenticatedAdminSaasEmpresasRoute
   AuthenticatedAdminSaasUsuariosRoute: typeof AuthenticatedAdminSaasUsuariosRoute
+  AuthenticatedSegurancaPrimeiroAcessoRoute: typeof AuthenticatedSegurancaPrimeiroAcessoRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -397,6 +418,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAdminSaasEmpresasRoute: AuthenticatedAdminSaasEmpresasRoute,
   AuthenticatedAdminSaasUsuariosRoute: AuthenticatedAdminSaasUsuariosRoute,
+  AuthenticatedSegurancaPrimeiroAcessoRoute:
+    AuthenticatedSegurancaPrimeiroAcessoRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

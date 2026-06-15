@@ -11,6 +11,8 @@ const corsHeaders = {
 const COMPANY_ROLES = ["admin_empresa", "gestor", "almoxarife", "solicitante", "auditor"] as const;
 
 const GLOBAL_ROLES = ["super_admin", "suporte", "financeiro", "comercial"] as const;
+const FIRST_ACCESS_PATH = "/seguranca/primeiro-acesso";
+const MIN_PASSWORD_LENGTH = 10;
 
 const MODULES = [
   "dashboard",
@@ -84,6 +86,7 @@ type CallerProfile = {
   permissions: string[] | null;
   global_role: string | null;
   blocked: boolean;
+  must_change_password: boolean;
 };
 
 class HttpError extends Error {
@@ -124,6 +127,21 @@ function getAdminClient() {
   });
 }
 
+function getAnonClient() {
+  const url = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!url || !anonKey) {
+    throw new HttpError(500, "Cliente anonimo do Supabase nao configurado.");
+  }
+
+  return createClient(url, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
 function response(status: number, body: JsonRecord) {
   return Response.json(body, { status, headers: corsHeaders });
 }
@@ -150,6 +168,55 @@ function text(value: unknown, fallback = "") {
 function nullableText(value: unknown) {
   const next = text(value);
   return next.length ? next : null;
+}
+
+function getFirstAccessRedirectTo(payload: JsonRecord) {
+  const explicit = text(payload.redirectTo ?? payload.redirect_to);
+  if (explicit) return explicit;
+
+  const appUrl = text(
+    Deno.env.get("APP_URL") ??
+      Deno.env.get("SITE_URL") ??
+      Deno.env.get("PUBLIC_SITE_URL") ??
+      Deno.env.get("SUPABASE_AUTH_SITE_URL"),
+  );
+
+  if (!appUrl) return undefined;
+  return `${appUrl.replace(/\/+$/, "")}${FIRST_ACCESS_PATH}`;
+}
+
+function validatePasswordStrength(password: string, email: string, fullName: string | null) {
+  const normalizedPassword = password.toLowerCase();
+  const emailLocalPart = email.split("@")[0]?.toLowerCase() ?? "";
+  const nameParts =
+    fullName
+      ?.toLowerCase()
+      .split(/\s+/)
+      .map((part) => part.trim())
+      .filter((part) => part.length >= 4) ?? [];
+
+  const failures: string[] = [];
+  if (password.length < MIN_PASSWORD_LENGTH)
+    failures.push(`minimo de ${MIN_PASSWORD_LENGTH} caracteres`);
+  if (!/[A-Z]/.test(password)) failures.push("uma letra maiuscula");
+  if (!/[a-z]/.test(password)) failures.push("uma letra minuscula");
+  if (!/\d/.test(password)) failures.push("um numero");
+  if (!/[^A-Za-z0-9]/.test(password)) failures.push("um simbolo");
+  if (emailLocalPart.length >= 4 && normalizedPassword.includes(emailLocalPart)) {
+    failures.push("nao conter partes do e-mail");
+  }
+  if (nameParts.some((part) => normalizedPassword.includes(part))) {
+    failures.push("nao conter partes do nome");
+  }
+
+  return failures;
+}
+
+function assertPasswordStrength(password: string, email: string, fullName: string | null) {
+  const failures = validatePasswordStrength(password, email, fullName);
+  if (failures.length) {
+    throw new HttpError(400, `A senha deve ter ${failures.join(", ")}.`);
+  }
 }
 
 function positiveInteger(value: unknown, fallback: number) {
@@ -192,6 +259,7 @@ function isGlobalRole(value: unknown): value is (typeof GLOBAL_ROLES)[number] {
 }
 
 function isSuperAdmin(profile: CallerProfile) {
+  if (profile.must_change_password) return false;
   return profile.global_role === "super_admin" || profile.role === "admin";
 }
 
@@ -204,7 +272,7 @@ function assertSuperAdmin(profile: CallerProfile) {
 async function getCaller(admin: SupabaseClient, callerId: string) {
   const { data, error } = await admin
     .from("profiles")
-    .select("id, email, full_name, role, permissions, global_role, blocked")
+    .select("id, email, full_name, role, permissions, global_role, blocked, must_change_password")
     .eq("id", callerId)
     .maybeSingle();
 
@@ -231,6 +299,10 @@ async function getCompany(admin: SupabaseClient, companyId: string) {
 }
 
 async function assertCompanyAdmin(admin: SupabaseClient, caller: CallerProfile, companyId: string) {
+  if (caller.must_change_password) {
+    throw new HttpError(403, "Troque sua senha antes de administrar usuarios.");
+  }
+
   if (isSuperAdmin(caller)) return;
 
   const company = await getCompany(admin, companyId);
@@ -354,14 +426,19 @@ async function createOrResolveUser(
   const email = text(payload.email).toLowerCase();
   const fullName = nullableText(payload.fullName ?? payload.full_name);
   const password = text(payload.password);
+  const now = new Date().toISOString();
 
   if (!email) throw new HttpError(400, "Informe o e-mail do usuario.");
-  if (password && password.length < 6)
-    throw new HttpError(400, "A senha deve ter ao menos 6 caracteres.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpError(400, "Informe um e-mail valido.");
+  }
+  if (password) assertPasswordStrength(password, email, fullName);
 
   const existingProfile = await admin
     .from("profiles")
-    .select("id, email, full_name, role, permissions, global_role, blocked")
+    .select(
+      "id, email, full_name, role, permissions, global_role, blocked, must_change_password, password_change_required_at, first_login_completed_at",
+    )
     .eq("email", email)
     .maybeSingle();
 
@@ -389,6 +466,7 @@ async function createOrResolveUser(
     } else {
       const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
         data: { full_name: fullName },
+        redirectTo: getFirstAccessRedirectTo(payload),
       });
       if (error) throw new HttpError(500, error.message);
       userId = data.user?.id ?? null;
@@ -416,9 +494,16 @@ async function createOrResolveUser(
         role: "viewer",
         permissions: [],
         blocked: false,
+        must_change_password: true,
+        password_change_required_at: now,
+        invited_at: invited ? now : null,
       };
 
   if (globalRole) profilePayload.global_role = globalRole;
+  if (existingProfile.data && existingProfile.data.must_change_password) {
+    profilePayload.password_change_required_at =
+      existingProfile.data.password_change_required_at ?? now;
+  }
 
   const profileRequest = existingProfile.data
     ? admin.from("profiles").update(profilePayload).eq("id", userId)
@@ -734,6 +819,89 @@ async function updateGlobalRole(admin: SupabaseClient, caller: CallerProfile, pa
   return { profile };
 }
 
+async function verifyCurrentPassword(caller: CallerProfile, currentPassword: string) {
+  if (!currentPassword) return;
+
+  const client = getAnonClient();
+  const { error } = await client.auth.signInWithPassword({
+    email: caller.email,
+    password: currentPassword,
+  });
+
+  await client.auth.signOut().catch(() => undefined);
+
+  if (error) {
+    throw new HttpError(400, "Senha atual ou temporaria invalida.");
+  }
+}
+
+async function changeFirstLoginPassword(
+  admin: SupabaseClient,
+  caller: CallerProfile,
+  payload: JsonRecord,
+) {
+  if (!caller.must_change_password) {
+    throw new HttpError(400, "Nao ha troca obrigatoria de senha pendente.");
+  }
+
+  const currentPassword = text(payload.currentPassword ?? payload.current_password);
+  const newPassword = text(payload.newPassword ?? payload.new_password ?? payload.password);
+  if (!newPassword) throw new HttpError(400, "Informe a nova senha.");
+
+  assertPasswordStrength(newPassword, caller.email, caller.full_name);
+
+  if (currentPassword && currentPassword === newPassword) {
+    throw new HttpError(400, "A nova senha deve ser diferente da senha atual.");
+  }
+
+  await verifyCurrentPassword(caller, currentPassword);
+
+  const { data: previous } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", caller.id)
+    .maybeSingle();
+
+  const authUpdate = await admin.auth.admin.updateUserById(caller.id, {
+    password: newPassword,
+  });
+  if (authUpdate.error) throw new HttpError(500, authUpdate.error.message);
+
+  const now = new Date().toISOString();
+  const { data: profile, error } = await admin
+    .from("profiles")
+    .update({
+      must_change_password: false,
+      password_changed_at: now,
+      first_login_completed_at: previous?.first_login_completed_at ?? now,
+      last_login_at: now,
+      updated_at: now,
+    })
+    .eq("id", caller.id)
+    .select("*")
+    .single();
+
+  if (error) throw new HttpError(500, error.message);
+
+  await writeAuditLog(admin, {
+    action: "user_first_login_password_changed",
+    tableName: "profiles",
+    recordId: caller.id,
+    description: "Senha atualizada no primeiro acesso",
+    callerId: caller.id,
+    metadata: {
+      target_user_id: caller.id,
+      target_email: caller.email,
+      verified_current_password: Boolean(currentPassword),
+    },
+    oldData: previous,
+    newData: profile,
+    targetUserId: caller.id,
+  });
+
+  return { profile };
+}
+
 const authenticatedHandler = withSupabase({ auth: "user" }, async (req, ctx) => {
   try {
     const claims = ctx.userClaims as Record<string, unknown> | undefined;
@@ -760,6 +928,8 @@ const authenticatedHandler = withSupabase({ auth: "user" }, async (req, ctx) => 
         return response(200, await setUserBlocked(admin, caller, payload));
       case "update_global_role":
         return response(200, await updateGlobalRole(admin, caller, payload));
+      case "change_first_login_password":
+        return response(200, await changeFirstLoginPassword(admin, caller, payload));
       default:
         throw new HttpError(400, "Acao administrativa invalida.");
     }

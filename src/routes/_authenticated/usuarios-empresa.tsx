@@ -48,7 +48,6 @@ type CompanyUserRow = {
 type UserForm = {
   fullName: string;
   email: string;
-  password: string;
   role: CompanyRole;
 };
 
@@ -56,7 +55,6 @@ function emptyForm(): UserForm {
   return {
     fullName: "",
     email: "",
-    password: "",
     role: "solicitante",
   };
 }
@@ -119,13 +117,13 @@ function CompanyUsersPage() {
         companyId: activeCompany.id,
         fullName: form.fullName,
         email: form.email,
-        password: form.password,
+        redirectTo: `${window.location.origin}/seguranca/primeiro-acesso`,
         role: form.role,
         permissions: DEFAULT_COMPANY_ROLE_PERMISSIONS[form.role],
       });
     },
     onSuccess: () => {
-      toast.success("Usuario criado");
+      toast.success("Convite enviado ao usuario");
       setOpen(false);
       invalidate();
     },
@@ -243,6 +241,9 @@ function CompanyUsersPage() {
                   <Badge variant={userRow.active ? "default" : "secondary"}>
                     {userRow.active ? "Ativo" : "Inativo"}
                   </Badge>
+                  {userRow.profile?.must_change_password && (
+                    <Badge variant="outline">Primeiro acesso</Badge>
+                  )}
                   {userRow.profile?.blocked && <Badge variant="destructive">Bloqueado</Badge>}
                   <Badge variant="outline">{permissionCount}</Badge>
                   <SearchableSelect
@@ -358,15 +359,6 @@ function CompanyUsersPage() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label>Senha temporaria</Label>
-              <Input
-                type="password"
-                value={form.password}
-                onChange={(event) => update("password", event.target.value)}
-              />
-            </div>
-
             <DialogFooter className="md:col-span-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancelar

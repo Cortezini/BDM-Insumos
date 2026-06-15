@@ -18,7 +18,13 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user && !authLoading) navigate({ to: getDefaultRoute(profile) ?? "/" });
+    if (user && !authLoading) {
+      navigate({
+        to: profile?.must_change_password
+          ? "/seguranca/primeiro-acesso"
+          : (getDefaultRoute(profile) ?? "/"),
+      });
+    }
   }, [user, profile, authLoading, navigate]);
 
   const submit = async (e: React.FormEvent) => {
