@@ -737,7 +737,8 @@ async function updateGlobalRole(admin: SupabaseClient, caller: CallerProfile, pa
 const authenticatedHandler = withSupabase({ auth: "user" }, async (req, ctx) => {
   try {
     const claims = ctx.userClaims as Record<string, unknown> | undefined;
-    const callerId = text(claims?.sub);
+    const jwtClaims = ctx.jwtClaims as Record<string, unknown> | undefined;
+    const callerId = text(claims?.id ?? claims?.sub ?? jwtClaims?.sub);
     if (!callerId) throw new HttpError(401, "Sessao invalida.");
 
     const admin = getAdminClient();
