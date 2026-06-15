@@ -24,9 +24,14 @@ import type { PermissionKey, Profile, UserRole } from "@/lib/database.types";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({ component: Page });
 
+type CompanyUserProfile = Profile & {
+  membership_id: string;
+  company_id: string;
+};
+
 function Page() {
   const qc = useQueryClient();
-  const { profile, hasRole } = useAuth();
+  const { profile, hasRole, activeCompany } = useAuth();
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
   const [expandedUsers, setExpandedUsers] = useState<string[]>([]);
   const permissionGroups = useMemo(
@@ -38,16 +43,39 @@ function Page() {
     [],
   );
 
-  const users = useQuery<Profile[]>({
-    queryKey: ["profiles", "list"],
+  const users = useQuery<CompanyUserProfile[]>({
+    queryKey: ["company_members", "profiles", activeCompany?.id],
     queryFn: async () => {
-      const { data } = await db
-        .from("profiles")
-        .select("*")
+      const { data, error } = await db
+        .from("company_members")
+        .select(
+          "id, company_id, user_id, role, permissions, profile:profiles(id, email, full_name, created_at)",
+        )
+        .eq("company_id", activeCompany!.id)
         .order("created_at", { ascending: false });
-      return (data ?? []) as Profile[];
+      if (error) throw error;
+
+      return (
+        (data ?? []) as {
+          id: string;
+          company_id: string;
+          user_id: string;
+          role: UserRole;
+          permissions: PermissionKey[] | null;
+          profile: Pick<Profile, "id" | "email" | "full_name" | "created_at"> | null;
+        }[]
+      ).map((row) => ({
+        id: row.user_id,
+        membership_id: row.id,
+        company_id: row.company_id,
+        email: row.profile?.email ?? "",
+        full_name: row.profile?.full_name ?? null,
+        role: row.role,
+        permissions: row.permissions,
+        created_at: row.profile?.created_at ?? "",
+      }));
     },
-    enabled: hasRole("admin"),
+    enabled: hasRole("admin") && !!activeCompany,
   });
 
   const updateProfile = useMutation({
@@ -67,26 +95,38 @@ function Page() {
 
   const updateRole = useMutation({
     mutationFn: async ({ id, role }: { id: string; role: UserRole }) => {
+      if (!activeCompany) throw new Error("Selecione uma empresa antes de alterar permissões.");
+
       const payload =
         role === "admin" ? { role } : { role, permissions: DEFAULT_ROLE_PERMISSIONS[role] };
-      const { error } = await db.from("profiles").update(payload).eq("id", id);
+      const { error } = await db
+        .from("company_members")
+        .update(payload)
+        .eq("company_id", activeCompany.id)
+        .eq("user_id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Permissão atualizada");
-      qc.invalidateQueries({ queryKey: ["profiles"] });
+      qc.invalidateQueries({ queryKey: ["company_members"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const updatePermissions = useMutation({
     mutationFn: async ({ id, permissions }: { id: string; permissions: PermissionKey[] }) => {
-      const { error } = await db.from("profiles").update({ permissions }).eq("id", id);
+      if (!activeCompany) throw new Error("Selecione uma empresa antes de alterar permissões.");
+
+      const { error } = await db
+        .from("company_members")
+        .update({ permissions })
+        .eq("company_id", activeCompany.id)
+        .eq("user_id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Permissões atualizadas");
-      qc.invalidateQueries({ queryKey: ["profiles"] });
+      qc.invalidateQueries({ queryKey: ["company_members"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

@@ -10,23 +10,28 @@ import { DataTable } from "@/components/shared/DataTable";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { db } from "@/lib/supabase";
 import { currency, number, dateTimeBR, dateBR, exportToCSV, exportToPDF } from "@/lib/format";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({ component: Page });
 
 function Page() {
+  const { activeCompany } = useAuth();
+  const companyId = activeCompany?.id;
   const today = new Date().toISOString().slice(0, 10);
   const monthAgo = new Date(Date.now() - 30 * 86400 * 1000).toISOString().slice(0, 10);
   const [from, setFrom] = useState(monthAgo);
   const [to, setTo] = useState(today);
 
   const movs = useQuery({
-    queryKey: ["report", "movements", from, to],
+    queryKey: ["report", "movements", companyId, from, to],
+    enabled: !!companyId,
     queryFn: async () => {
       const { data } = await db
         .from("stock_movements")
         .select(
           "*, product:products(name, sku, unit), supplier:suppliers(name), person:people(full_name), cost_center:cost_centers(name)",
         )
+        .eq("company_id", companyId)
         .gte("movement_date", from)
         .lte("movement_date", to + "T23:59:59")
         .order("movement_date", { ascending: false });
@@ -35,13 +40,15 @@ function Page() {
   });
 
   const inventory = useQuery({
-    queryKey: ["report", "inventory"],
+    queryKey: ["report", "inventory", companyId],
+    enabled: !!companyId,
     queryFn: async () => {
       const { data } = await db
         .from("products")
         .select(
           "*, category:product_categories(name), supplier:suppliers(name), location:locations(name)",
         )
+        .eq("company_id", companyId)
         .eq("active", true)
         .order("name");
       return data ?? [];

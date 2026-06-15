@@ -19,10 +19,13 @@ import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { db } from "@/lib/supabase";
 import { dateTimeBR } from "@/lib/format";
 import type { AuditLog, Profile } from "@/lib/database.types";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/_authenticated/logs")({ component: LogsPage });
 
 const actionLabels: Record<string, string> = {
+  asset_created: "Ativo cadastrado",
+  asset_updated: "Ativo atualizado",
   record_created: "Cadastro",
   quotation_created: "Cotação criada",
   quotation_approved: "Aprovação",
@@ -32,22 +35,28 @@ const actionLabels: Record<string, string> = {
   quotation_status_updated: "Status atualizado",
   stock_in: "Entrada",
   stock_out: "Saída",
+  company_user_permissions_updated: "Permissões da empresa",
   user_permissions_updated: "Permissões",
 };
 
 const actionClasses: Record<string, string> = {
+  asset_created: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+  asset_updated: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20",
   record_created: "bg-blue-500/10 text-blue-600 border-blue-500/20",
   quotation_created: "bg-sky-500/10 text-sky-600 border-sky-500/20",
   quotation_approved: "bg-green-500/10 text-green-600 border-green-500/20",
   quotation_rejected: "bg-destructive/10 text-destructive border-destructive/20",
   stock_in: "bg-[color:var(--success)]/15 text-[color:var(--success)] border-transparent",
   stock_out: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  company_user_permissions_updated: "bg-violet-500/10 text-violet-600 border-violet-500/20",
   user_permissions_updated: "bg-violet-500/10 text-violet-600 border-violet-500/20",
 };
 
 const tableLabels: Record<string, string> = {
   asset_types: "Tipos de ativo",
   audit_logs: "Logs",
+  companies: "Empresas",
+  company_members: "Usuários por empresa",
   cost_centers: "Centros de custo",
   locations: "Localizações",
   people: "Pessoas",
@@ -71,6 +80,22 @@ function getTableLabel(tableName: string) {
   );
 }
 
+function getActionLabel(log: AuditLog) {
+  if (log.action === "record_created" && log.table_name === "ti_assets") {
+    return "Ativo cadastrado";
+  }
+
+  return actionLabels[log.action] ?? log.action;
+}
+
+function getActionClass(log: AuditLog) {
+  if (log.action === "record_created" && log.table_name === "ti_assets") {
+    return actionClasses.asset_created;
+  }
+
+  return actionClasses[log.action] ?? "border-border";
+}
+
 function normalizeSearchText(value: unknown) {
   return String(value ?? "")
     .normalize("NFD")
@@ -84,6 +109,8 @@ function stringifyDetails(value: unknown) {
 }
 
 function LogsPage() {
+  const { activeCompany } = useAuth();
+  const companyId = activeCompany?.id;
   const [query, setQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("todos");
   const [tableFilter, setTableFilter] = useState("todos");
@@ -91,11 +118,13 @@ function LogsPage() {
   const pageSize = 10;
 
   const logs = useQuery<AuditLog[]>({
-    queryKey: ["audit_logs", "list"],
+    queryKey: ["audit_logs", "list", companyId],
+    enabled: !!companyId,
     queryFn: async () => {
       const { data, error } = await db
         .from("audit_logs")
         .select("*")
+        .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
@@ -104,11 +133,29 @@ function LogsPage() {
   });
 
   const profiles = useQuery<Profile[]>({
-    queryKey: ["profiles", "audit-log-users"],
+    queryKey: ["profiles", "audit-log-users", companyId],
+    enabled: !!companyId,
     queryFn: async () => {
-      const { data, error } = await db.from("profiles").select("id, email, full_name, role");
+      const { data, error } = await db
+        .from("company_members")
+        .select("user_id, role, permissions, profile:profiles(id, email, full_name, created_at)")
+        .eq("company_id", companyId);
       if (error) throw error;
-      return (data ?? []) as Profile[];
+      return (
+        (data ?? []) as {
+          user_id: string;
+          role: Profile["role"];
+          permissions: Profile["permissions"];
+          profile: Pick<Profile, "id" | "email" | "full_name" | "created_at"> | null;
+        }[]
+      ).map((row) => ({
+        id: row.user_id,
+        email: row.profile?.email ?? "",
+        full_name: row.profile?.full_name ?? null,
+        role: row.role,
+        permissions: row.permissions,
+        created_at: row.profile?.created_at ?? "",
+      }));
     },
   });
 
@@ -162,7 +209,7 @@ function LogsPage() {
         normalizeSearchText(log.table_name).includes(search) ||
         normalizeSearchText(getTableLabel(log.table_name)).includes(search) ||
         normalizeSearchText(log.action).includes(search) ||
-        normalizeSearchText(actionLabels[log.action]).includes(search) ||
+        normalizeSearchText(getActionLabel(log)).includes(search) ||
         normalizeSearchText(userLabel).includes(search);
 
       return matchesAction && matchesTable && matchesQuery;
@@ -263,11 +310,8 @@ function LogsPage() {
                         {dateTimeBR(log.created_at)}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={actionClasses[log.action] ?? "border-border"}
-                        >
-                          {actionLabels[log.action] ?? log.action}
+                        <Badge variant="outline" className={getActionClass(log)}>
+                          {getActionLabel(log)}
                         </Badge>
                       </TableCell>
                       <TableCell>

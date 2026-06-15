@@ -31,8 +31,28 @@ export interface Profile {
   created_at: string;
 }
 
+export interface Company {
+  id: string;
+  name: string;
+  document: string | null;
+  active: boolean;
+  created_at: string;
+}
+
+export interface CompanyMembership {
+  id: string;
+  company_id: string;
+  user_id: string;
+  role: UserRole;
+  permissions: PermissionKey[] | null;
+  active: boolean;
+  created_at: string;
+  company?: Company | null;
+}
+
 export interface Supplier {
   id: string;
+  company_id: string;
   name: string;
   document: string | null;
   contact: string | null;
@@ -45,6 +65,7 @@ export interface Supplier {
 
 export interface Person {
   id: string;
+  company_id: string;
   full_name: string;
   document: string | null;
   role: string | null;
@@ -58,6 +79,7 @@ export interface Person {
 
 export interface CostCenter {
   id: string;
+  company_id: string;
   name: string;
   code: string | null;
   responsible: string | null;
@@ -68,6 +90,7 @@ export interface CostCenter {
 
 export interface Location {
   id: string;
+  company_id: string;
   name: string;
   code: string | null;
   description: string | null;
@@ -77,12 +100,14 @@ export interface Location {
 
 export interface ProductCategory {
   id: string;
+  company_id: string;
   name: string;
   created_at: string;
 }
 
 export interface Product {
   id: string;
+  company_id: string;
   name: string;
   sku: string;
   category_id: string | null;
@@ -105,6 +130,7 @@ export type MovementType = "in" | "out";
 
 export interface StockMovement {
   id: string;
+  company_id: string;
   type: MovementType;
   movement_date: string;
   product_id: string;
@@ -128,6 +154,7 @@ export interface StockMovement {
 
 export interface AuditLog {
   id: string;
+  company_id: string;
   action: string;
   table_name: string;
   record_id: string | null;

@@ -71,7 +71,8 @@ type SupplierStats = {
 
 function QuotationsPage() {
   const qc = useQueryClient();
-  const { hasRole, hasPermission } = useAuth();
+  const { hasRole, hasPermission, activeCompany } = useAuth();
+  const companyId = activeCompany?.id;
   const canCreateQuote = hasPermission("quotations.create");
   const canReviewQuotes = hasRole("admin");
   const [isOpen, setIsOpen] = useState(false);
@@ -112,13 +113,16 @@ function QuotationsPage() {
 
   const reviewQuote = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
+      if (!companyId) throw new Error("Selecione uma empresa antes de revisar cotações.");
+
       const { error } = await db
         .from("quotations")
         .update({
           status,
           review_notes: status === "approved" ? null : "Reprovada pelo administrador",
         })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("company_id", companyId);
       if (error) throw error;
     },
     onSuccess: (_, variables) => {

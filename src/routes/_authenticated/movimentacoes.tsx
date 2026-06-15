@@ -26,7 +26,8 @@ export const Route = createFileRoute("/_authenticated/movimentacoes")({ componen
 
 function Page() {
   const qc = useQueryClient();
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, activeCompany } = useAuth();
+  const companyId = activeCompany?.id;
   const canViewAll = hasPermission("movements.view");
   const canViewIn = canViewAll || hasPermission("movements.view_in");
   const canViewOut = canViewAll || hasPermission("movements.view_out");
@@ -39,14 +40,15 @@ function Page() {
     return types;
   }, [canViewIn, canViewOut]);
   const list = useQuery<StockMovement[]>({
-    queryKey: ["stock_movements", "list", allowedTypes.join(",")],
-    enabled: allowedTypes.length > 0,
+    queryKey: ["stock_movements", "list", companyId, allowedTypes.join(",")],
+    enabled: allowedTypes.length > 0 && !!companyId,
     queryFn: async () => {
       const { data, error } = await db
         .from("stock_movements")
         .select(
           "*, product:products(id, name, sku, unit, current_stock, avg_cost), supplier:suppliers(name), person:people(full_name), cost_center:cost_centers(name), location:locations(name)",
         )
+        .eq("company_id", companyId)
         .in("type", allowedTypes)
         .order("movement_date", { ascending: false });
       if (error) throw error;
@@ -83,6 +85,8 @@ function Page() {
 
   const create = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
+      if (!companyId) throw new Error("Selecione uma empresa antes de movimentar estoque.");
+
       const productId = payload.product_id as string;
       const product = (products.data ?? []).find((p) => p.id === productId);
       if (!product) throw new Error("Produto não encontrado");
@@ -99,6 +103,7 @@ function Page() {
       }
 
       const movement = {
+        company_id: companyId,
         type,
         product_id: productId,
         quantity: qty,
@@ -127,7 +132,8 @@ function Page() {
       const { error: upErr } = await db
         .from("products")
         .update({ current_stock: newStock, avg_cost: newAvg })
-        .eq("id", productId);
+        .eq("id", productId)
+        .eq("company_id", companyId);
       if (upErr) throw upErr;
     },
     onSuccess: () => {

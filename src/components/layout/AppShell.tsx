@@ -35,6 +35,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const nav: Array<{
   to: string;
@@ -72,7 +79,7 @@ function isActivePath(pathname: string, to: string) {
 
 export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, companies, activeCompany, setActiveCompanyId } = useAuth();
   const { theme, toggle } = useTheme();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const routePermissions = getRoutePermissions(pathname);
@@ -217,6 +224,29 @@ export function AppShell() {
               />
             </div>
             <div className="ml-auto flex items-center gap-1 sm:gap-2">
+              {activeCompany && (
+                <div className="hidden min-w-0 items-center gap-2 md:flex">
+                  <Building2 className="size-4 shrink-0 text-muted-foreground" />
+                  {companies.length > 1 ? (
+                    <Select value={activeCompany.id} onValueChange={setActiveCompanyId}>
+                      <SelectTrigger className="h-9 w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="max-w-48 truncate text-sm font-medium">
+                      {activeCompany.name}
+                    </span>
+                  )}
+                </div>
+              )}
               <Button size="icon" variant="ghost" onClick={toggle} title="Alternar tema">
                 {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
               </Button>

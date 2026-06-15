@@ -15,6 +15,7 @@ import {
 import { db } from "@/lib/supabase";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { currency, number, dateTimeBR } from "@/lib/format";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/_authenticated/")({ component: DashboardPage });
 
@@ -28,24 +29,41 @@ interface Stats {
 }
 
 function DashboardPage() {
+  const { activeCompany } = useAuth();
+  const companyId = activeCompany?.id;
+
   const { data: stats } = useQuery<Stats>({
-    queryKey: ["dashboard", "stats"],
+    queryKey: ["dashboard", "stats", companyId],
+    enabled: !!companyId,
     queryFn: async () => {
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
       const [products, movsIn, movsOut, suppliers, low] = await Promise.all([
-        db.from("products").select("current_stock, avg_cost, min_stock, active"),
+        db
+          .from("products")
+          .select("current_stock, avg_cost, min_stock, active")
+          .eq("company_id", companyId),
         db
           .from("stock_movements")
           .select("quantity")
+          .eq("company_id", companyId)
           .eq("type", "in")
           .gte("movement_date", monthStart),
         db
           .from("stock_movements")
           .select("quantity")
+          .eq("company_id", companyId)
           .eq("type", "out")
           .gte("movement_date", monthStart),
-        db.from("suppliers").select("id", { count: "exact", head: true }).eq("active", true),
-        db.from("products").select("id, current_stock, min_stock").eq("active", true),
+        db
+          .from("suppliers")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", companyId)
+          .eq("active", true),
+        db
+          .from("products")
+          .select("id, current_stock, min_stock")
+          .eq("company_id", companyId)
+          .eq("active", true),
       ]);
       const prods = (products.data ?? []) as {
         current_stock: number;
@@ -76,13 +94,15 @@ function DashboardPage() {
   });
 
   const { data: chart } = useQuery({
-    queryKey: ["dashboard", "chart"],
+    queryKey: ["dashboard", "chart", companyId],
+    enabled: !!companyId,
     queryFn: async () => {
       const from = new Date(Date.now() - 29 * 86400 * 1000);
       from.setHours(0, 0, 0, 0);
       const { data } = await db
         .from("stock_movements")
         .select("type, quantity, movement_date")
+        .eq("company_id", companyId)
         .gte("movement_date", from.toISOString());
       const days: Record<string, { day: string; entradas: number; saidas: number }> = {};
       for (let i = 0; i < 30; i++) {
@@ -108,11 +128,13 @@ function DashboardPage() {
   });
 
   const { data: recent } = useQuery({
-    queryKey: ["dashboard", "recent"],
+    queryKey: ["dashboard", "recent", companyId],
+    enabled: !!companyId,
     queryFn: async () => {
       const { data } = await db
         .from("stock_movements")
         .select("id, type, quantity, movement_date, product:products(name, sku)")
+        .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(6);
       return (data ?? []) as {
@@ -126,11 +148,13 @@ function DashboardPage() {
   });
 
   const { data: alerts } = useQuery({
-    queryKey: ["dashboard", "alerts"],
+    queryKey: ["dashboard", "alerts", companyId],
+    enabled: !!companyId,
     queryFn: async () => {
       const { data } = await db
         .from("products")
         .select("id, name, sku, current_stock, min_stock")
+        .eq("company_id", companyId)
         .eq("active", true);
       return (
         (data ?? []) as {
