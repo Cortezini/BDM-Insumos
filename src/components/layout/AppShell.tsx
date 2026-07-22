@@ -170,6 +170,7 @@ export function AppShell() {
   const hasRouteAccess = !routePermissions || canAny(profile, routePermissions);
   const defaultRoute = getDefaultRoute(profile);
   const enabledModules = new Set(activeCompany?.modules ?? []);
+  const canSwitchCompany = profile?.role === "super_admin";
   const visibleNav = nav.filter((item) => {
     if (!canAny(profile, item.permission)) return false;
     if (item.global) return true;
@@ -318,7 +319,7 @@ export function AppShell() {
               {activeCompany && (
                 <div className="hidden min-w-0 items-center gap-2 md:flex">
                   <Building2 className="size-4 shrink-0 text-muted-foreground" />
-                  {companies.length > 1 ? (
+                  {canSwitchCompany && companies.length > 1 ? (
                     <Select value={activeCompany.id} onValueChange={setActiveCompanyId}>
                       <SelectTrigger className="h-9 w-48">
                         <SelectValue />

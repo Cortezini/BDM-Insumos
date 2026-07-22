@@ -74,7 +74,8 @@ function QuotationsPage() {
   const { hasRole, hasPermission, activeCompany } = useAuth();
   const companyId = activeCompany?.id;
   const canCreateQuote = hasPermission("quotations.create");
-  const canReviewQuotes = hasRole("admin");
+  const canReviewQuotes = hasRole("super_admin", "admin", "admin_empresa", "gestor");
+  const canDeleteQuote = hasRole("admin", "admin_empresa");
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState(initialQuoteForm);
   const [analysisProductId, setAnalysisProductId] = useState<string>("all");
@@ -502,7 +503,7 @@ function QuotationsPage() {
                             </Button>
                           </>
                         )}
-                        {canReviewQuotes && (
+                        {canDeleteQuote && (
                           <Button
                             variant="ghost"
                             size="sm"

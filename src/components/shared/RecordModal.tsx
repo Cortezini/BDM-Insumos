@@ -86,24 +86,32 @@ export function RecordModal({
 }: Props) {
   const [values, setValues] = useState<RecordModalValues>({});
   const fieldsRef = useRef(fields);
+  const initializedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     fieldsRef.current = fields;
   }, [fields]);
 
   useEffect(() => {
-    if (open) {
-      const init: RecordModalValues = {};
-      const src = (initial ?? {}) as RecordModalValues;
-      fieldsRef.current.forEach((f) => {
-        const v = src[f.name];
-        if (f.type === "switch") init[f.name] = v ?? true;
-        else if (f.type === "currency") init[f.name] = formatCurrencyInputValue(v);
-        else init[f.name] = v ?? "";
-      });
-      if (src.id) init.id = src.id;
-      setValues(init);
+    if (!open) {
+      initializedKeyRef.current = null;
+      return;
     }
+
+    const src = (initial ?? {}) as RecordModalValues;
+    const initialKey = src.id ? `record:${String(src.id)}` : "new-record";
+    if (initializedKeyRef.current === initialKey) return;
+
+    const init: RecordModalValues = {};
+    fieldsRef.current.forEach((f) => {
+      const v = src[f.name];
+      if (f.type === "switch") init[f.name] = v ?? true;
+      else if (f.type === "currency") init[f.name] = formatCurrencyInputValue(v);
+      else init[f.name] = v ?? "";
+    });
+    if (src.id) init.id = src.id;
+    initializedKeyRef.current = initialKey;
+    setValues(init);
   }, [open, initial]);
 
   const set = (k: string, v: unknown) => setValues((s) => ({ ...s, [k]: v }));

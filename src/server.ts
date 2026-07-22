@@ -55,6 +55,26 @@ function readString(payload: BrasilApiCnpjPayload, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function hasSupplierEmail(payload: BrasilApiCnpjPayload): boolean {
+  return Boolean(readString(payload, "email"));
+}
+
+function mergeCnpjPayload(
+  primary: BrasilApiCnpjPayload,
+  fallback: BrasilApiCnpjPayload,
+): BrasilApiCnpjPayload {
+  const merged = { ...primary };
+
+  for (const [key, value] of Object.entries(fallback)) {
+    const current = merged[key];
+    if (current !== null && current !== undefined && current !== "") continue;
+    if (value === null || value === undefined || value === "") continue;
+    merged[key] = value;
+  }
+
+  return merged;
+}
+
 function formatCnpj(cnpj: string): string {
   const digits = onlyDigits(cnpj);
   if (digits.length !== 14) return cnpj;
@@ -127,6 +147,7 @@ function extractBrasilApiError(payload: unknown, body: string): string {
 
 async function fetchBrasilApiCnpj(cnpj: string): Promise<BrasilApiLookupResult> {
   let lastError: BrasilApiLookupResult | null = null;
+  let bestResult: Extract<BrasilApiLookupResult, { ok: true }> | null = null;
 
   for (const provider of CNPJ_PROVIDERS) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -142,7 +163,19 @@ async function fetchBrasilApiCnpj(cnpj: string): Promise<BrasilApiLookupResult> 
         const payload = body ? (JSON.parse(body) as BrasilApiCnpjPayload) : null;
 
         if (response.ok && payload) {
-          return { ok: true, payload, source: provider.name };
+          bestResult = bestResult
+            ? {
+                ok: true,
+                payload: mergeCnpjPayload(bestResult.payload, payload),
+                source: `${bestResult.source} + ${provider.name}`,
+              }
+            : { ok: true, payload, source: provider.name };
+
+          if (hasSupplierEmail(bestResult.payload)) {
+            return bestResult;
+          }
+
+          break;
         }
 
         lastError = {
@@ -166,6 +199,8 @@ async function fetchBrasilApiCnpj(cnpj: string): Promise<BrasilApiLookupResult> 
       }
     }
   }
+
+  if (bestResult) return bestResult;
 
   return (
     lastError ?? {

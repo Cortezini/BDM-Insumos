@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!baseProfile || baseProfile.must_change_password || baseProfile.must_enroll_mfa) {
       return false;
     }
-    return baseProfile.global_role === "super_admin" || baseProfile.role === "admin";
+    return baseProfile.global_role === "super_admin";
   }
 
   function getEffectiveProfile(
@@ -190,11 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const nextMemberships = (data ?? []) as CompanyMembership[];
-    const storedCompanyId = getStoredActiveCompanyId();
-    const nextCompanyId =
-      nextMemberships.find((membership) => membership.company_id === storedCompanyId)?.company_id ??
-      nextMemberships[0]?.company_id ??
-      null;
+    const nextCompanyId = nextMemberships[0]?.company_id ?? null;
 
     setMemberships(nextMemberships);
     setActiveCompanyIdState(nextCompanyId);
@@ -236,11 +232,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const nextMemberships = await loadMemberships(uid, nextProfile);
-    const storedCompanyId = getStoredActiveCompanyId();
-    const selectedMembership =
-      nextMemberships.find((membership) => membership.company_id === storedCompanyId) ??
-      nextMemberships[0] ??
-      null;
+    const selectedMembership = isSuperAdminProfile(nextProfile)
+      ? (nextMemberships.find(
+          (membership) => membership.company_id === getStoredActiveCompanyId(),
+        ) ??
+        nextMemberships[0] ??
+        null)
+      : (nextMemberships[0] ?? null);
 
     setProfile(nextProfile);
     setLoading(false);
@@ -293,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const effectiveProfile = getEffectiveProfile(profile, activeMembership);
 
   const setActiveCompanyId = (companyId: string) => {
+    if (!isSuperAdminProfile(profile)) return;
     if (!memberships.some((membership) => membership.company_id === companyId)) return;
     setActiveCompanyIdState(companyId);
     persistActiveCompanyId(companyId);
